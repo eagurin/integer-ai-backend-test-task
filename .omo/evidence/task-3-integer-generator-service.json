@@ -1,0 +1,114 @@
+{
+  "DoneClaim": {
+    "task": 3,
+    "summary": "Added strict API schemas and raw-body HMAC-SHA256 verification.",
+    "scope": "API schemas, app.security helper, focused unit tests, and this evidence artifact only."
+  },
+  "changed_files": [
+    "app/api/schemas/__init__.py",
+    "app/api/schemas/balance.py",
+    "app/api/schemas/common.py",
+    "app/api/schemas/generation.py",
+    "app/api/schemas/webhooks.py",
+    "app/security.py",
+    "tests/unit/test_api_schemas.py",
+    "tests/unit/test_webhook_signatures.py",
+    ".omo/evidence/task-3-integer-generator-service.json"
+  ],
+  "baseline": {
+    "head": "f3b0fee6a471b5a943cb947065f63c9b3381d73c",
+    "branch": "work/integer-generator-service-wave-1-todo-3",
+    "initial_status": "Only .omo/plans/integer-generator-service.md was modified; preserved unchanged.",
+    "command": "uv run pytest -q",
+    "exit_code": 0,
+    "output": "3 passed, 1 warning in 1.14s"
+  },
+  "verification": [
+    {
+      "command": "uv run pytest -q tests/unit/test_api_schemas.py tests/unit/test_webhook_signatures.py",
+      "exit_code": 0,
+      "output": "29 passed in 0.09s"
+    },
+    {
+      "command": "uv run pytest -q",
+      "exit_code": 0,
+      "output": "32 passed, 1 warning in 0.36s"
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "24 files already formatted"
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 23 source files"
+    },
+    {
+      "command": "uv run python -c 'import hashlib,hmac; from app.security import verify_webhook_signature; body=b\"{}\"; sig=hmac.new(b\"qa-secret\",body,hashlib.sha256).hexdigest(); assert verify_webhook_signature(body,sig,\"qa-secret\") is True; assert verify_webhook_signature(body+b\"x\",sig,\"qa-secret\") is False; assert verify_webhook_signature(body,None,\"qa-secret\") is False; print(\"valid=accepted tampered=rejected missing=rejected\")'",
+      "exit_code": 0,
+      "output": "valid=accepted tampered=rejected missing=rejected"
+    },
+    {
+      "command": "GIT_MASTER=1 git diff --check",
+      "exit_code": 0,
+      "output": "No whitespace errors."
+    },
+    {
+      "command": "GIT_MASTER=1 git diff --exit-code HEAD -- uv.lock",
+      "exit_code": 0,
+      "output": "uv.lock unchanged."
+    }
+  ],
+  "adversarial": {
+    "malformed_input": {
+      "result": "pass",
+      "reason": "Tests reject blank prompt, malformed reference URL, invalid task identifier, omitted/empty/unknown payment status, nonpositive payment tokens, unknown provider outcome, unknown task status, missing signature, malformed hex, uppercase signature, and tampered raw body."
+    },
+    "stale_state": {
+      "result": "pass",
+      "reason": "Task-1 baseline commit and lockfile are confirmed; uv run succeeded without changing uv.lock or introducing dependency assumptions."
+    },
+    "dirty_worktree": {
+      "result": "pass",
+      "reason": "Initial status contained only the pre-modified plan copy. It was not edited or staged. Product changes are limited to the listed task-3 paths."
+    },
+    "flaky_tests": {
+      "result": "pass",
+      "reason": "New tests contain no sleeps, polling, or timing assertions; final focused and full suites passed."
+    },
+    "misleading_success_output": {
+      "result": "pass",
+      "reason": "CLI exit code was observed as 0 and its stdout exactly matched the required acceptance line."
+    },
+    "hung_or_long_commands": {
+      "result": "not_applicable",
+      "reason": "Every bounded test, lint, format, type-check, and CLI invocation completed normally; no server or container was started."
+    },
+    "prompt_injection": {
+      "result": "not_applicable",
+      "reason": "The inspected task-3 code validates caller prompt data but does not execute prompts or expose an agent/tool instruction flow."
+    },
+    "cancel_resume": {
+      "result": "not_applicable",
+      "reason": "No cancellation or resumable job flow exists in the inspected task-3 schema/security source."
+    },
+    "repeated_interruptions": {
+      "result": "not_applicable",
+      "reason": "No signal, retry-loop, or interrupt-resume mechanism was introduced."
+    }
+  },
+  "cleanup": "None; no server, container, or other long-lived QA resource was spawned.",
+  "risks": [
+    "Schemas define contracts only; business routes and signature-to-HTTP-401 wiring belong to later plan tasks.",
+    "Pydantic schema validation rejects extra fields and coerced Python values by design; HTTP JSON uses the declared UUID, URL, and enum representations."
+  ],
+  "commit": {
+    "subject": "feat(api): validate request contracts and raw-body signatures"
+  }
+}
