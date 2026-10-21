@@ -1,10 +1,10 @@
 """PostgreSQL-backed generation admission and task-history behavior."""
 
-import asyncio
-from contextlib import AbstractAsyncContextManager
-from typing import Any
+import json
+from contextlib import AsyncExitStack
 from uuid import UUID, uuid4
 
+import anyio
 import httpx
 import pytest
 from app.api.controllers.generation import service
@@ -22,25 +22,23 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 async def client_for(
     session_factory: async_sessionmaker[AsyncSession],
-) -> tuple[httpx.AsyncClient, AbstractAsyncContextManager[Any]]:
+) -> tuple[httpx.AsyncClient, AsyncExitStack]:
     """Create an ASGI client using the migrated PostgreSQL database."""
     application = create_app(Settings(webhook_secret=SecretStr("generation-secret")))
-    context = application.router.lifespan_context(application)
-    await context.__aenter__()
+    cleanup = AsyncExitStack()
+    await cleanup.enter_async_context(application.router.lifespan_context(application))
     application.state.session_factory = session_factory
     client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application, raise_app_exceptions=False),
         base_url="http://test",
     )
-    return client, context
+    return client, cleanup
 
 
-async def close_client(
-    client: httpx.AsyncClient, context: AbstractAsyncContextManager[None]
-) -> None:
+async def close_client(client: httpx.AsyncClient, cleanup: AsyncExitStack) -> None:
     """Close the HTTP client and application lifespan."""
     await client.aclose()
-    await context.__aexit__(None, None, None)
+    await cleanup.aclose()
 
 
 async def add_funded_user(
@@ -141,9 +139,6 @@ async def test_valid_request_debits_once_and_returns_task_id(
                     TokenLedgerEntry.operation_key == f"generation:{task_id}:debit"
                 )
             )
-            model = await session.scalar(
-                select(GenerationModel).where(GenerationModel.key == "image-fast")
-            )
 
         assert task is not None
         assert task.status == "processing"
@@ -154,7 +149,6 @@ async def test_valid_request_debits_once_and_returns_task_id(
         assert attempt.external_id == f"temporary-alpha-{task_id}"
         assert debit is not None
         assert debit.delta == -2
-        assert model is not None
         assert response.json() == {"task_id": str(task_id)}
     finally:
         await close_client(client, cleanup)
@@ -229,6 +223,33 @@ async def test_no_compatible_leg_returns_400_without_debit(
         await close_client(client, cleanup)
 
 
+async def test_malformed_reference_returns_422_without_writes(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    """Invalid reference URLs retain the raw-body validation response."""
+    user_id = await add_funded_user(session_factory)
+    before = await user_counts(session_factory, user_id)
+    client, cleanup = await client_for(session_factory)
+    try:
+        body = json.dumps(
+            {
+                "user_id": str(user_id),
+                "model": "image-fast",
+                "prompt": "A geometric landscape",
+                "ref_images": ["not-a-url"],
+            }
+        ).encode()
+        response = await client.post(
+            "/generate",
+            content=body,
+            headers={"Content-Type": "application/json"},
+        )
+        assert response.status_code == 422
+        assert await user_counts(session_factory, user_id) == before
+    finally:
+        await close_client(client, cleanup)
+
+
 async def test_fourth_active_task_returns_429_without_debit(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -266,24 +287,31 @@ async def test_concurrent_requests_serialize_balance_checks(
     """Separate request sessions cannot spend the same final balance twice."""
     user_id = await add_funded_user(session_factory, balance=2)
     client, cleanup = await client_for(session_factory)
-    barrier = asyncio.Barrier(2)
+    barrier = anyio.Event()
+    arrivals = 0
     get_for_update = service.users.get_for_update
 
     async def synchronize_before_lock(
         session: AsyncSession, requested_user_id: UUID
     ) -> User | None:
+        nonlocal arrivals
+        arrivals += 1
+        if arrivals == 2:
+            barrier.set()
         await barrier.wait()
         return await get_for_update(session, requested_user_id)
 
     monkeypatch.setattr(service.users, "get_for_update", synchronize_before_lock)
     try:
-        responses = await asyncio.wait_for(
-            asyncio.gather(
-                post_image_generation(client, user_id),
-                post_image_generation(client, user_id),
-            ),
-            timeout=5,
-        )
+        responses: list[httpx.Response] = []
+
+        async def post_generation() -> None:
+            responses.append(await post_image_generation(client, user_id))
+
+        with anyio.fail_after(5):
+            async with anyio.create_task_group() as task_group:
+                task_group.start_soon(post_generation)
+                task_group.start_soon(post_generation)
         assert sorted(response.status_code for response in responses) == [202, 402]
         assert await user_counts(session_factory, user_id) == (2, 1, 1, 0)
     finally:

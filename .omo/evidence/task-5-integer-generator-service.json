@@ -3,9 +3,10 @@
     "task": "Implement generation admission, debit, task status, and history APIs",
     "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
     "base_commit": "0913beef62b3b312921440e7fe8fe8a241b8fd5a",
-    "commit_subject": "feat(generation): admit tasks only after locked balance validation",
+    "commit_subject": "fix(generation): publish request schema for API clients",
     "commit_hash": null,
-    "commit_hash_note": "The full commit hash is returned separately because this evidence file is included in that commit."
+    "commit_hash_note": "The full follow-up commit hash is returned separately because this evidence file is included in that commit.",
+    "previous_task5_commit": "00150433425f641fd5bdb576b9ee6b45216569b9"
   },
   "changed_files": [
     "app/api/controllers/generation.py",
@@ -19,9 +20,16 @@
     "tests/integration/test_generation.py",
     ".omo/evidence/task-5-integer-generator-service.json"
   ],
+  "follow_up_changed_files": [
+    "app/api/controllers/generation.py",
+    "tests/integration/test_generation.py",
+    "tests/unit/test_app.py",
+    ".omo/evidence/task-5-integer-generator-service.json"
+  ],
   "preserved_preexisting_work": [
     ".omo/plans/integer-generator-service.md was already modified before task-5 work and was not edited or staged.",
     ".omo/evidence/task-4-gate-review.md was already untracked before task-5 work and was not edited or staged.",
+    ".omo/evidence/task-5-code-review.md was already untracked before this follow-up and was not edited or staged.",
     "Initial and pre-commit Git status are recorded under adversarial.dirty_worktree."
   ],
   "baseline": {
@@ -103,7 +111,7 @@
         "result": "Success: no issues found in 49 source files."
       }
     ],
-    "concurrency": "The concurrent admission test uses two HTTP requests with independent request AsyncSessions and an asyncio.Barrier(2) immediately before the user-row lock; it asserts one 202, one 402, one debit, one task, and one attempt. asyncio.wait_for bounds the test at 5 seconds. No sleep, polling, SQLite, or in-memory database is used."
+    "concurrency": "The original task-5 commit used asyncio.Barrier(2); this follow-up replaces it with an AnyIO Event gate and create_task_group. The current test keeps two independent request AsyncSessions, asserts one 202/one 402 and one debit/task/attempt, and bounds execution with fail_after(5). No direct asyncio, sleep, polling, SQLite, or in-memory database remains in this test."
   },
   "manual_http_qa": {
     "database_setup": {
@@ -250,7 +258,7 @@
     },
     "flaky_tests": {
       "outcome": "PASS",
-      "evidence": "Concurrent admission is coordinated with asyncio.Barrier(2), separate request AsyncSessions, and a bounded asyncio.wait_for. No fixed sleeps or polling."
+      "evidence": "The original commit used asyncio.Barrier(2); the follow-up uses an AnyIO Event gate and task group, separate request AsyncSessions, and fail_after(5). No direct asyncio, fixed sleeps, or polling."
     },
     "misleading_success_output": {
       "outcome": "PASS",
@@ -282,6 +290,270 @@
       "exit_code": 0,
       "receipt": "PostgreSQL container, integer-generator-wave2-todo5_postgres-data volume, and default network removed. docker compose ps -a was empty; docker volume ls --filter name=integer-generator-wave2-todo5_postgres-data returned no volume."
     }
+  },
+  "follow_up_review": {
+    "base_commit": "00150433425f641fd5bdb576b9ee6b45216569b9",
+    "findings": {
+      "openapi_request_schema": {
+        "resolution": "POST /generate now declares an openapi_extra requestBody schema generated from GenerateRequest.model_json_schema(). Runtime request parsing remains GenerateRequest.model_validate_json(await request.body()), so FastAPI does not reorder or replace validation.",
+        "regression_test": "tests/unit/test_app.py::test_openapi_exposes_generation_request_fields reads /openapi.json and checks requiredness, field names, and required fields."
+      },
+      "redundant_catalog_query": {
+        "resolution": "Removed the extra image-fast catalog SELECT and model-is-not-none assertion from test_valid_request_debits_once_and_returns_task_id; retained assertions for the accepted task, provider attempt, and exact debit."
+      },
+      "typing_and_async_runtime": {
+        "resolution": "Removed Any and direct asyncio imports from tests/integration/test_generation.py. AsyncExitStack types the lifespan cleanup; AnyIO Event and create_task_group coordinate the two request sessions, with fail_after(5) bounding the deterministic test.",
+        "remaining_direct_asyncio": false,
+        "sleep_or_polling": false
+      }
+    },
+    "pre_change_state": {
+      "head": "00150433425f641fd5bdb576b9ee6b45216569b9",
+      "git_status": [
+        " M .omo/plans/integer-generator-service.md",
+        "?? .omo/evidence/task-4-gate-review.md",
+        "?? .omo/evidence/task-5-code-review.md"
+      ],
+      "baseline_commands": [
+        {
+          "command": "docker compose -p integer-generator-wave2-todo5 up -d --wait db",
+          "exit_code": 0,
+          "result": "PostgreSQL 18 became healthy."
+        },
+        {
+          "command": "uv run alembic upgrade head",
+          "exit_code": 0,
+          "result": "Applied revision 0001_initial_catalog."
+        },
+        {
+          "command": "uv run pytest -q",
+          "exit_code": 0,
+          "result": "50 passed, 1 warning in 1.18s."
+        }
+      ]
+    },
+    "regression_runs": [
+      {
+        "command": "uv run pytest -q tests/unit/test_app.py::test_openapi_exposes_generation_request_fields",
+        "exit_code": 1,
+        "result": "Before the route fix, the new machine test failed with KeyError: 'requestBody' (1 failed, 1 warning in 0.28s)."
+      },
+      {
+        "command": "uv run pytest -q tests/unit/test_app.py::test_openapi_exposes_generation_request_fields tests/integration/test_generation.py::test_malformed_reference_returns_422_without_writes",
+        "exit_code": 0,
+        "result": "2 passed, 1 warning in 0.38s after adding openapi_extra; valid/malformed raw-body handling remained intact."
+      },
+      {
+        "command": "uv run ruff format --check .",
+        "exit_code": 1,
+        "result": "The first post-edit check reported tests/integration/test_generation.py would be reformatted. The two lines were adjusted, and the final check below passed."
+      }
+    ],
+    "final_commands": [
+      {
+        "command": "uv run pytest -q tests/integration/test_generation.py",
+        "exit_code": 0,
+        "result": "7 passed in 0.84s."
+      },
+      {
+        "command": "uv run pytest -q",
+        "exit_code": 0,
+        "result": "52 passed, 1 warning in 1.00s. The warning is the existing StarletteDeprecationWarning about using httpx with starlette.testclient."
+      },
+      {
+        "command": "uv run ruff check .",
+        "exit_code": 0,
+        "result": "All checks passed!"
+      },
+      {
+        "command": "uv run ruff format --check .",
+        "exit_code": 0,
+        "result": "52 files already formatted."
+      },
+      {
+        "command": "uv run mypy .",
+        "exit_code": 0,
+        "result": "Success: no issues found in 49 source files."
+      }
+    ],
+    "manual_http_qa": {
+      "database_setup": {
+        "command": "docker compose -p integer-generator-wave2-todo5 down -v && docker compose -p integer-generator-wave2-todo5 up -d --wait db && uv run alembic upgrade head",
+        "exit_code": 0,
+        "result": "Fresh PostgreSQL database migrated with revision 0001_initial_catalog."
+      },
+      "server": {
+        "command": "WEBHOOK_SECRET=qa-secret DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/integer_generator uv run uvicorn app.main:app --host 127.0.0.1 --port 8776",
+        "startup": "INFO: Application startup complete.",
+        "pid": 53139,
+        "shutdown": "Ctrl-C; graceful application shutdown; Finished server process [53139]. Exit code 0."
+      },
+      "openapi": {
+        "request": "GET http://127.0.0.1:8776/openapi.json",
+        "exit_code": 0,
+        "http_status": 200,
+        "request_body_required": true,
+        "properties": {
+          "user_id": "string, format uuid",
+          "model": "string, minLength 1, maxLength 100",
+          "prompt": "string, minLength 1, maxLength 10000",
+          "ref_images": "array of uri strings, maxItems 10"
+        },
+        "required_fields": [
+          "user_id",
+          "model",
+          "prompt"
+        ]
+      },
+      "signed_payment": {
+        "signature_generation": "const { createHmac } = await import('node:crypto'); createHmac('sha256', 'qa-secret').update(body, 'utf8').digest('hex')",
+        "exact_payload": "{\"payment_id\":\"88888888-8888-4888-8888-888888888888\",\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"tokens\":100,\"status\":\"succeeded\"}",
+        "signature": "818ef16929b7dd8ac1477b935e60749d9a189b69578539b867eab4e903f097eb",
+        "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/webhooks/payments -H 'Content-Type: application/json' -H 'X-Signature: 818ef16929b7dd8ac1477b935e60749d9a189b69578539b867eab4e903f097eb' --data-binary '{\"payment_id\":\"88888888-8888-4888-8888-888888888888\",\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"tokens\":100,\"status\":\"succeeded\"}'",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 204 No Content"
+      },
+      "generation": {
+        "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"image-fast\",\"prompt\":\"task 5 follow-up schema smoke\",\"ref_images\":[]}'",
+        "exit_code": 0,
+        "task_id": "324f7edc-976a-4143-ba5a-9c495bce810e",
+        "raw_response": "HTTP/1.1 202 Accepted\n{\"task_id\":\"324f7edc-976a-4143-ba5a-9c495bce810e\"}"
+      },
+      "task_status": {
+        "command": "curl -i --max-time 5 http://127.0.0.1:8776/tasks/324f7edc-976a-4143-ba5a-9c495bce810e",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 200 OK\n{\"task_id\":\"324f7edc-976a-4143-ba5a-9c495bce810e\",\"status\":\"processing\",\"current_provider\":\"alpha\",\"output\":null,\"history\":[{\"provider\":\"alpha\",\"outcome\":null,\"error\":null,\"created_at\":\"2026-10-21T20:30:20.821879Z\"}]}"
+      },
+      "balance": {
+        "command": "curl -i --max-time 5 http://127.0.0.1:8776/users/66666666-6666-4666-8666-666666666666/balance",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 200 OK\n{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"balance\":98,\"history\":[{\"operation\":\"generation\",\"delta\":-2,\"created_at\":\"2026-10-21T20:30:20.821879Z\"},{\"operation\":\"payment\",\"delta\":100,\"created_at\":\"2026-10-21T20:30:13.101121Z\"}]}"
+      },
+      "incompatible_request": {
+        "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"video-long\",\"prompt\":\"three references remain incompatible\",\"ref_images\":[\"https://example.com/one.png\",\"https://example.com/two.png\",\"https://example.com/three.png\"]}'",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 400 Bad Request\n{\"detail\":\"No compatible provider leg\"}"
+      },
+      "other_rejections": [
+        {
+          "case": "Malformed reference URL",
+          "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"image-fast\",\"prompt\":\"bad reference\",\"ref_images\":[\"not-a-url\"]}'",
+          "exit_code": 0,
+          "raw_response": "HTTP/1.1 422 Unprocessable Content"
+        },
+        {
+          "case": "Unknown catalog model",
+          "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"unknown-model\",\"prompt\":\"unknown model\",\"ref_images\":[]}'",
+          "exit_code": 0,
+          "raw_response": "HTTP/1.1 400 Bad Request\n{\"detail\":\"No compatible provider leg\"}"
+        },
+        {
+          "case": "Unknown task",
+          "command": "curl -i --max-time 5 http://127.0.0.1:8776/tasks/99999999-9999-4999-8999-999999999999",
+          "exit_code": 0,
+          "raw_response": "HTTP/1.1 404 Not Found\n{\"detail\":\"Task not found\"}"
+        }
+      ],
+      "database_before_and_after_rejections": {
+        "query": "SELECT COALESCE(SUM(delta),0) AS balance, COUNT(*) AS ledger_rows FROM token_ledger_entries WHERE user_id='66666666-6666-4666-8666-666666666666'; SELECT COUNT(*) AS tasks FROM generation_tasks WHERE user_id='66666666-6666-4666-8666-666666666666'; SELECT COUNT(*) AS attempts FROM generation_attempts WHERE task_id='324f7edc-976a-4143-ba5a-9c495bce810e';",
+        "before": {
+          "balance": 98,
+          "ledger_rows": 2,
+          "tasks": 1,
+          "attempts": 1
+        },
+        "after": {
+          "balance": 98,
+          "ledger_rows": 2,
+          "tasks": 1,
+          "attempts": 1
+        },
+        "ledger": [
+          {
+            "operation_key": "payment:88888888-8888-4888-8888-888888888888",
+            "delta": 100
+          },
+          {
+            "operation_key": "generation:324f7edc-976a-4143-ba5a-9c495bce810e:debit",
+            "delta": -2
+          }
+        ],
+        "task_attempt": {
+          "status": "processing",
+          "provider": "alpha",
+          "current_attempt_id": "c5edd693-cfa7-45e8-ae77-b2d4064ab394",
+          "attempt_no": 1,
+          "attempt_status": "processing",
+          "external_id": "temporary-alpha-324f7edc-976a-4143-ba5a-9c495bce810e"
+        }
+      }
+    },
+    "adversarial": {
+      "malformed_input": {
+        "outcome": "PASS",
+        "evidence": "The generated OpenAPI request schema contains the four request properties. A malformed reference returns 422; an unknown model and a valid video-long request with three references return 400."
+      },
+      "stale_state": {
+        "outcome": "PASS",
+        "evidence": "PostgreSQL reports balance 98 from +100/-2 ledger rows. Rejected incompatible, malformed, and unknown-model inputs leave ledger rows, task rows, and attempt rows unchanged. Existing tests cover current active-task state and concurrent ledger checks."
+      },
+      "dirty_worktree": {
+        "outcome": "PASS",
+        "before_follow_up": [
+          " M .omo/plans/integer-generator-service.md",
+          "?? .omo/evidence/task-4-gate-review.md",
+          "?? .omo/evidence/task-5-code-review.md"
+        ],
+        "preservation": "The plan, task-4 gate report, and task-5 code-review report were not edited or staged."
+      },
+      "hung_or_long_commands": {
+        "outcome": "PASS",
+        "evidence": "Every live curl used --max-time 5. Uvicorn requests began after the Application startup complete event. Compose, tests, and cleanup used monitored commands; no polling or sleep loop was used."
+      },
+      "flaky_tests": {
+        "outcome": "PASS",
+        "evidence": "The concurrency test uses an AnyIO Event gate, two request AsyncSessions, create_task_group, and fail_after(5); it asserts one 202, one 402, one debit, one task, and one attempt. No direct asyncio, sleeps, or polling."
+      },
+      "misleading_success_output": {
+        "outcome": "PASS",
+        "evidence": "Raw HTTP status/body outputs were reconciled with direct PostgreSQL ledger sums and ledger/task/attempt counts before and after rejection."
+      },
+      "prompt_injection": {
+        "outcome": "N/A",
+        "evidence": "No prompt execution or model integration is part of task 5."
+      },
+      "cancel_resume": {
+        "outcome": "N/A",
+        "evidence": "No cancellation or resumable workflow exists in task 5."
+      },
+      "repeated_interruptions": {
+        "outcome": "N/A",
+        "evidence": "No interruption loop exists in task 5."
+      }
+    },
+    "cleanup": {
+      "api_server": {
+        "pid": 53139,
+        "stop": "Ctrl-C",
+        "exit_code": 0,
+        "receipt": "Application shutdown complete; Finished server process [53139]."
+      },
+      "compose": {
+        "project": "integer-generator-wave2-todo5",
+        "command": "docker compose -p integer-generator-wave2-todo5 down -v",
+        "exit_code": 0,
+        "receipt": "PostgreSQL container, volume integer-generator-wave2-todo5_postgres-data, and default network removed; docker compose ps -a was empty and docker volume ls --filter name=integer-generator-wave2-todo5_postgres-data returned no volume."
+      }
+    },
+    "commit": {
+      "subject": "fix(generation): publish request schema for API clients",
+      "hash": null,
+      "note": "The full hash is supplied in the final DoneClaim because this evidence file is committed by that commit."
+    },
+    "residual_issues": [
+      "The earlier task-5 handoff remains: todo 6 must transport and persist prompt/ref_images as needed when it replaces TemporaryProviderPort with real fake-provider services. Provider callbacks and watchdog remain out of scope.",
+      "The pre-existing basedpyright diagnostic at app/factory.py:18 about the required webhook_secret remains; the required mypy command passes."
+    ]
   },
   "risks_and_handoffs": [
     "Todo 6 must replace TemporaryProviderPort with the configurable fake provider services and callback flow. The current GenerationTask schema does not persist prompt/ref_images, and the temporary port receives only provider name and task id; Todo 6 must define payload transport and any persistence needed for failover/replay without holding a database transaction open during provider HTTP.",

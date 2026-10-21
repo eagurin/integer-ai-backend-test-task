@@ -24,6 +24,16 @@ SessionDependency = Annotated[AsyncSession, Depends(get_session)]
     "/generate",
     response_model=GenerateResponse,
     status_code=status.HTTP_202_ACCEPTED,
+    openapi_extra={
+        "requestBody": {
+            "content": {
+                "application/json": {
+                    "schema": GenerateRequest.model_json_schema(),
+                }
+            },
+            "required": True,
+        }
+    },
 )
 async def generate(request: Request, session: SessionDependency) -> GenerateResponse:
     """Create one new generation order and return its task identifier."""
