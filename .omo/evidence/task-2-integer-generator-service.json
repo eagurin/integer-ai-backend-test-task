@@ -1,0 +1,195 @@
+{
+  "DoneClaim": {
+    "plan_checkbox": 2,
+    "title": "Define PostgreSQL models, repositories, catalog migration, and database Compose service",
+    "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1-task-2",
+    "result": "Implemented typed SQLAlchemy models and repositories, an async Alembic initial migration with the exact catalog seed, a PostgreSQL 18 Compose service, and PostgreSQL integration tests.",
+    "commit": {
+      "subject": "feat(db): seed the catalog and constrain ledger identities",
+      "hash": "e20e4c1872b1e21f464ac50405d8dedb9005c63a"
+    },
+    "independent_adversarial_verification": "Pending in a separate context."
+  },
+  "changed_files": [
+    ".omo/evidence/task-2-integer-generator-service.json",
+    "alembic.ini",
+    "alembic/env.py",
+    "alembic/script.py.mako",
+    "alembic/versions/0001_initial_catalog.py",
+    "app/models/__init__.py",
+    "app/models/base.py",
+    "app/models/generation_attempt.py",
+    "app/models/generation_model.py",
+    "app/models/generation_task.py",
+    "app/models/payment_identity.py",
+    "app/models/token_ledger_entry.py",
+    "app/models/user.py",
+    "app/repositories/__init__.py",
+    "app/repositories/attempt_repository.py",
+    "app/repositories/generation_catalog_repository.py",
+    "app/repositories/payment_identity_repository.py",
+    "app/repositories/task_repository.py",
+    "app/repositories/token_ledger_repository.py",
+    "app/repositories/user_repository.py",
+    "compose.yaml",
+    "pyproject.toml",
+    "tests/conftest.py",
+    "tests/integration/test_catalog.py",
+    "tests/integration/test_constraints.py",
+    "uv.lock"
+  ],
+  "checks": [
+    {
+      "command": "uv run pytest -q",
+      "exit_code": 0,
+      "output": "3 passed, 1 warning in 1.13s; warning: StarletteDeprecationWarning about using httpx with starlette.testclient."
+    },
+    {
+      "command": "uv lock",
+      "exit_code": 0,
+      "output": "Resolved 44 packages; added alembic 1.20.0, mako 1.4.3, and markupsafe 3.0.4."
+    },
+    {
+      "command": "uv sync --locked",
+      "exit_code": 0,
+      "output": "Resolved 44 packages; checked 43 packages."
+    },
+    {
+      "command": "docker compose config -q",
+      "exit_code": 0,
+      "output": "No output; Compose configuration accepted."
+    },
+    {
+      "command": "docker compose up -d db && uv run alembic upgrade head && uv run alembic current",
+      "exit_code": 0,
+      "output": "PostgreSQL 18 started; Alembic applied 0001_initial_catalog; current revision: 0001_initial_catalog (head)."
+    },
+    {
+      "command": "uv run alembic downgrade base && uv run alembic upgrade head",
+      "exit_code": 0,
+      "output": "The initial revision downgraded to base and upgraded to 0001_initial_catalog."
+    },
+    {
+      "command": "uv run pytest -q tests/integration/test_catalog.py tests/integration/test_constraints.py",
+      "attempts": [
+        {
+          "exit_code": 1,
+          "output": "Initial run: 4 failed due to a session-scoped AsyncEngine being reused across pytest event loops; RuntimeError reported a Future attached to a different loop."
+        },
+        {
+          "exit_code": 1,
+          "output": "After making the engine fixture function-scoped: 6 passed, 1 failed because the PostgreSQL immutability trigger raises DBAPIError rather than IntegrityError."
+        },
+        {
+          "exit_code": 0,
+          "output": "7 passed in 0.27s after matching the actual DBAPIError behavior."
+        }
+      ]
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "35 files already formatted."
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 34 source files."
+    },
+    {
+      "command": "docker compose up -d db && uv run alembic upgrade head && uv run pytest -q tests/integration/test_catalog.py",
+      "exit_code": 0,
+      "output": "Manual live-PostgreSQL catalog QA command completed successfully. The integration test asserts exact model prices, provider-leg ordering, max_refs, and skip_on_moderation values."
+    },
+    {
+      "command": "docker compose exec -T db psql -U postgres -d integer_generator -Atc \"SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name\"",
+      "exit_code": 0,
+      "database_output": "alembic_version\ngeneration_attempts\ngeneration_models\ngeneration_tasks\npayment_identities\nprovider_legs\ntoken_ledger_entries\nusers"
+    },
+    {
+      "command": "docker compose down",
+      "exit_code": 0,
+      "output": "PostgreSQL container and Compose network removed; named postgres-data volume retained."
+    }
+  ],
+  "adversarial_classes": {
+    "malformed_input": {
+      "result": "PASS",
+      "reason": "PostgreSQL tests reject non-positive model prices, duplicate payment ids, duplicate ledger operation keys, duplicate task attempt numbers, duplicate provider priorities, and ledger mutation."
+    },
+    "stale_state": {
+      "result": "PASS",
+      "reason": "uv sync --locked completed and Alembic downgrade base followed by upgrade head completed."
+    },
+    "dirty_worktree": {
+      "result": "PASS",
+      "reason": "GIT_MASTER=1 git status --short before and after database cleanup showed the same task-2 source changes and the pre-existing modified .omo/plans/integer-generator-service.md. The root draft and shared Boulder/ledger/evidence were not touched."
+    },
+    "hung_or_long_commands": {
+      "result": "PASS",
+      "reason": "Docker and migration watches had a 600000 ms deadline; cleanup had a 120 second deadline. No sleep loops were used."
+    },
+    "flaky_tests": {
+      "result": "PASS",
+      "reason": "The final PostgreSQL integration suite passed 7 tests in one run with no sleeps or timing assertions; the earlier event-loop fixture and exception-type mismatches were fixed."
+    },
+    "misleading_success_output": {
+      "result": "PASS",
+      "reason": "Recorded command exit results and the actual psql table query output; the catalog test and query both returned exit code 0."
+    },
+    "prompt_injection": {
+      "result": "N/A",
+      "reason": "No user-controlled prompt or external text is interpreted by the database layer in this task."
+    },
+    "cancel_resume": {
+      "result": "N/A",
+      "reason": "This scope adds no cancel/resume workflow or long-lived task execution."
+    },
+    "repeated_interruptions": {
+      "result": "N/A",
+      "reason": "No repeated interruption or resume cycle occurred during this one-shot database implementation."
+    }
+  },
+  "worktree_status": {
+    "before_database_cleanup": [
+      "M .omo/plans/integer-generator-service.md",
+      "M app/models/__init__.py",
+      "M app/repositories/__init__.py",
+      "M pyproject.toml",
+      "M uv.lock",
+      "?? alembic.ini",
+      "?? alembic/",
+      "?? app/models/base.py",
+      "?? app/models/generation_attempt.py",
+      "?? app/models/generation_model.py",
+      "?? app/models/generation_task.py",
+      "?? app/models/payment_identity.py",
+      "?? app/models/token_ledger_entry.py",
+      "?? app/models/user.py",
+      "?? app/repositories/attempt_repository.py",
+      "?? app/repositories/generation_catalog_repository.py",
+      "?? app/repositories/payment_identity_repository.py",
+      "?? app/repositories/task_repository.py",
+      "?? app/repositories/token_ledger_repository.py",
+      "?? app/repositories/user_repository.py",
+      "?? compose.yaml",
+      "?? tests/conftest.py",
+      "?? tests/integration/"
+    ],
+    "after_database_cleanup": "Identical to before_database_cleanup; root draft preserved."
+  },
+  "risks": [
+    "Integration tests use random identifiers and commit records into the local Compose database; the named volume is retained when the service is stopped."
+  ],
+  "cleanup_receipt": {
+    "command": "docker compose down",
+    "exit_code": 0,
+    "database_running": false,
+    "volume_deleted": false
+  }
+}
