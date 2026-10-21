@@ -365,8 +365,8 @@
   "preexisting_warning": "One StarletteDeprecationWarning is emitted by the existing starlette.testclient integration in the installed FastAPI/Starlette stack recommending httpx2; no test failed.",
   "diagnostic_observation": "Workspace LSP/basedpyright reported unresolved imports for modules present in this alternate worktree and Settings constructor diagnostics in existing factory/settings tests; the target-worktree mypy run passed, all imports executed in pytest, and all three live Uvicorn apps started successfully.",
   "commit": {
-    "status": "pending",
+    "status": "committed",
     "required_message": "feat(providers): route signed outcomes through the eligible next leg",
-    "hash": null
+    "hash": "5a02dc9dc3adc8b28876e6eb3844d19984a81e8d"
   }
 }
