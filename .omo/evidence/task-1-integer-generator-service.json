@@ -1,0 +1,228 @@
+{
+  "DoneClaim": {
+    "task": "1. Bootstrap the async Python service and toolchain",
+    "status": "implemented and verified",
+    "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1",
+    "baseline_commit": "c4d8f5c",
+    "summary": "Созданы Python 3.11+ пакет и lockfile, async FastAPI factory с /healthz, env-настройки с обязательным webhook secret, async SQLAlchemy engine/session factory, Dockerfile, конфигурации pytest/Ruff/mypy и bootstrap unit-тесты.",
+    "changed_files": [
+      ".dockerignore",
+      ".omo/evidence/task-1-integer-generator-service.json",
+      "Dockerfile",
+      "app/__init__.py",
+      "app/api/__init__.py",
+      "app/api/controllers/__init__.py",
+      "app/api/controllers/health.py",
+      "app/api/schemas/__init__.py",
+      "app/database.py",
+      "app/factory.py",
+      "app/main.py",
+      "app/models/__init__.py",
+      "app/providers/__init__.py",
+      "app/repositories/__init__.py",
+      "app/services/__init__.py",
+      "app/settings.py",
+      "app/workers/__init__.py",
+      "pyproject.toml",
+      "tests/unit/test_app.py",
+      "tests/unit/test_settings.py",
+      "uv.lock"
+    ],
+    "passing_checks": [
+      "uv sync --locked: exit 0",
+      "uv run pytest -q tests/unit/test_app.py: exit 0, 1 passed",
+      "uv run pytest -q tests/unit/test_settings.py::test_rejects_missing_webhook_secret: exit 0, 1 passed",
+      "uv run ruff check .: exit 0, All checks passed!",
+      "uv run ruff format --check .: exit 0, 17 files already formatted",
+      "uv run mypy .: exit 0, Success: no issues found in 16 source files",
+      "docker build -t integer-generator-bootstrap:task-1 .: exit 0"
+    ],
+    "manual_qa_result": "HTTP/1.1 200 OK with actual body {\"status\":\"ok\"}; see manual_qa.response for complete curl output.",
+    "cleanup_receipts": [
+      "Managed Uvicorn process 45126 stopped via Ctrl+C; exit code 0.",
+      "QA image integer-generator-bootstrap:task-1 removed; exit code 0."
+    ],
+    "known_risks": [
+      "Starlette emits an upstream TestClient/httpx deprecation warning; the test passes.",
+      "LSP basedpyright diagnostics use an interpreter that does not resolve .venv; required mypy check passes."
+    ],
+    "commit_message": "chore(core): lock the async toolchain for repeatable runs",
+    "commit_hash": "Reported in the final DoneClaim; a commit cannot include its own hash."
+  },
+  "changed_files": [
+    ".dockerignore",
+    ".omo/evidence/task-1-integer-generator-service.json",
+    "Dockerfile",
+    "app/__init__.py",
+    "app/api/__init__.py",
+    "app/api/controllers/__init__.py",
+    "app/api/controllers/health.py",
+    "app/api/schemas/__init__.py",
+    "app/database.py",
+    "app/factory.py",
+    "app/main.py",
+    "app/models/__init__.py",
+    "app/providers/__init__.py",
+    "app/repositories/__init__.py",
+    "app/services/__init__.py",
+    "app/settings.py",
+    "app/workers/__init__.py",
+    "pyproject.toml",
+    "tests/unit/test_app.py",
+    "tests/unit/test_settings.py",
+    "uv.lock"
+  ],
+  "baseline": {
+    "command": "GIT_MASTER=1 git -C /Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1 status --short",
+    "exit_code": 0,
+    "stdout": "",
+    "tracked_files": [
+      ".omo/plans/integer-generator-service.md"
+    ],
+    "interpretation": "Worktree был чистым; исходников и тестового набора в baseline не было."
+  },
+  "command_results": [
+    {
+      "command": "uv lock",
+      "exit_code": 0,
+      "output": "Resolved 41 packages in 376ms; закрепил sqlalchemy v2.1.6 -> v2.0.55 по диапазону плана."
+    },
+    {
+      "command": "uv sync --locked",
+      "exit_code": 0,
+      "output": "Using CPython 3.14.7; Resolved 41 packages; Installed 2 packages; sqlalchemy==2.0.55. Lockfile синхронизирован без изменений."
+    },
+    {
+      "command": "uv run pytest -q tests/unit/test_app.py",
+      "exit_code": 0,
+      "output": "1 passed, 1 warning in 0.40s."
+    },
+    {
+      "command": "uv run pytest -q tests/unit/test_settings.py::test_rejects_missing_webhook_secret",
+      "exit_code": 0,
+      "output": "1 passed in 0.09s."
+    },
+    {
+      "command": "uv run pytest -q tests/unit/test_settings.py",
+      "exit_code": 0,
+      "output": "2 passed in 0.09s, включая отсутствие и пустое значение секрета."
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 1,
+      "output": "Первая попытка: E501 в app/database.py и I001 в двух тестовых файлах; ошибки исправлены."
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 1,
+      "output": "Вторая попытка: один I001 в tests/unit/test_settings.py; исправлено."
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 1,
+      "output": "Первый прогон сообщил о форматировании app/database.py и app/settings.py; исправлено."
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "17 files already formatted."
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 16 source files."
+    },
+    {
+      "command": "docker build -t integer-generator-bootstrap:task-1 .",
+      "exit_code": 0,
+      "output": "Docker build завершился с DOCKER_BUILD_PASS; uv sync --locked --group dev --no-install-project и uv sync --locked --group dev прошли на Python 3.12-slim."
+    },
+    {
+      "command": "docker image rm integer-generator-bootstrap:task-1",
+      "exit_code": 0,
+      "output": "Untagged: integer-generator-bootstrap:task-1; Deleted: sha256:e0022069b3572546754b65800f5c5ca471834503125c29072137fa7d7a3dd87a."
+    }
+  ],
+  "manual_qa": {
+    "start_command": "cd /Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1 && WEBHOOK_SECRET=qa-bootstrap-secret uv run uvicorn app.main:app --host 127.0.0.1 --port 8765",
+    "startup_observed_before_request": [
+      "INFO:     Started server process [45126]",
+      "INFO:     Waiting for application startup.",
+      "INFO:     Application startup complete.",
+      "INFO:     Uvicorn running on http://127.0.0.1:8765 (Press CTRL+C to quit)"
+    ],
+    "request_command": "curl -i --max-time 5 http://127.0.0.1:8765/healthz",
+    "request_exit_code": 0,
+    "response": "HTTP/1.1 200 OK\ndate: Wed, 21 Oct 2026 17:31:44 GMT\nserver: uvicorn\ncontent-length: 15\ncontent-type: application/json\n\n{\"status\":\"ok\"}",
+    "cleanup": {
+      "action": "Ctrl+C sent to managed PTY bash_19",
+      "process_id": 45126,
+      "exit_code": 0,
+      "receipt": "^CINFO:     Shutting down\nINFO:     Waiting for application shutdown.\nINFO:     Application shutdown complete.\nINFO:     Finished server process [45126]"
+    }
+  },
+  "adversarial_classes": {
+    "malformed_input": {
+      "result": "PASS",
+      "reason": "test_rejects_missing_webhook_secret and test_rejects_invalid_webhook_secret raise Pydantic ValidationError for missing and whitespace-only WEBHOOK_SECRET."
+    },
+    "prompt_injection": {
+      "result": "NOT_APPLICABLE",
+      "reason": "Bootstrap содержит только локальную health route и не принимает недоверенный внешний текст."
+    },
+    "cancel_resume": {
+      "result": "NOT_APPLICABLE",
+      "reason": "В этом increment нет resumable или долгоживущих workflow."
+    },
+    "stale_state": {
+      "result": "PASS",
+      "reason": "Финальная pyproject.toml/uv.lock пара прошла uv sync --locked; Docker build повторно синхронизировал lockfile с dev-группой."
+    },
+    "dirty_worktree": {
+      "result": "PASS",
+      "reason": "Начальный статус был чистым. Все изменения делались в указанном worktree; черновик базового workspace не редактировался. uv.lock исключён глобальным ~/.gitignore_global:51 и будет добавлен явно только в разрешённый staging."
+    },
+    "hung_or_long_commands": {
+      "result": "PASS",
+      "reason": "uv sync и все требуемые проверки завершились; Docker build завершился exit code 0. Команды выполнялись с ограничениями времени, ожидания через sleep/poll не использовались."
+    },
+    "flaky_tests": {
+      "result": "PASS",
+      "reason": "Добавленные тесты синхронны, без sleep и timing assertions; оба обязательных pytest invocation прошли, полный settings-файл дал 2 passed."
+    },
+    "misleading_success_output": {
+      "result": "PASS",
+      "reason": "Результат HTTP проверен по raw curl output: HTTP/1.1 200 OK и фактическое тело {\"status\":\"ok\"}; команды проверок записаны с exit code."
+    },
+    "repeated_interruptions": {
+      "result": "NOT_APPLICABLE",
+      "reason": "В этом increment нет retry/resume interruption flow."
+    }
+  },
+  "worktree_status": {
+    "initial": {
+      "command": "GIT_MASTER=1 git -C /Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1 status --short",
+      "exit_code": 0,
+      "stdout": ""
+    },
+    "post_edit_pre_stage": {
+      "command": "GIT_MASTER=1 git -C /Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-1 status --short",
+      "exit_code": 0,
+      "stdout": "?? .dockerignore\n?? .omo/evidence/\n?? Dockerfile\n?? app/\n?? pyproject.toml\n?? tests/",
+      "note": "uv.lock скрыт глобальным ignore и должен быть staged адресно с -f; после фиксации ожидается чистый status."
+    }
+  },
+  "known_risks": [
+    "FastAPI TestClient выводит upstream StarletteDeprecationWarning: использование httpx через starlette.testclient deprecated; тест всё равно завершился успешно, dependency добавлена по запрошенному контракту.",
+    "LSP basedpyright не обнаружил .venv зависимости и просканировал содержимое .venv, выдав import/third-party diagnostics; uv run mypy . проходит без ошибок. Pyright конфигурацию не добавлял, так как plan требует mypy, а suppression ошибок не применял."
+  ],
+  "cleanup_receipts": [
+    "Managed Uvicorn process 45126 завершён, PTY завершился exit code 0.",
+    "QA Docker image integer-generator-bootstrap:task-1 удалён; docker image rm завершился exit code 0."
+  ]
+}
