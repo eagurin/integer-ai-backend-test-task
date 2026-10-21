@@ -19,7 +19,7 @@ async def database_engine() -> AsyncIterator[AsyncEngine]:
         "DATABASE_URL",
         "postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator",
     )
-    engine = create_async_engine(database_url, pool_pre_ping=True)
+    engine = create_async_engine(database_url, pool_pre_ping=True, pool_size=20)
     try:
         async with engine.connect():
             pass

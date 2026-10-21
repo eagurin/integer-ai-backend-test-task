@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.api.controllers.health import router as health_router
+from app.api.controllers.payments import router as payments_router
 from app.database import create_engine, create_session_factory
 from app.settings import Settings
 
@@ -26,4 +27,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(title="Integer Generator Service", lifespan=lifespan)
     application.include_router(health_router)
+    application.include_router(payments_router)
     return application
