@@ -15,6 +15,15 @@ class TaskRepository:
         """Return a task by id."""
         return await session.get(GenerationTask, task_id)
 
+    async def get_for_update(
+        self, session: AsyncSession, task_id: UUID
+    ) -> GenerationTask | None:
+        """Return and lock a task row before updating its accepted state."""
+        result = await session.execute(
+            select(GenerationTask).where(GenerationTask.id == task_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def add(self, session: AsyncSession, task: GenerationTask) -> GenerationTask:
         """Add and flush a task without committing the caller's transaction."""
         session.add(task)

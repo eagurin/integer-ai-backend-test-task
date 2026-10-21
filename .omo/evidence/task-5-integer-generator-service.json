@@ -1,0 +1,291 @@
+{
+  "DoneClaim": {
+    "task": "Implement generation admission, debit, task status, and history APIs",
+    "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+    "base_commit": "0913beef62b3b312921440e7fe8fe8a241b8fd5a",
+    "commit_subject": "feat(generation): admit tasks only after locked balance validation",
+    "commit_hash": null,
+    "commit_hash_note": "The full commit hash is returned separately because this evidence file is included in that commit."
+  },
+  "changed_files": [
+    "app/api/controllers/generation.py",
+    "app/factory.py",
+    "app/providers/__init__.py",
+    "app/repositories/attempt_repository.py",
+    "app/repositories/generation_catalog_repository.py",
+    "app/repositories/task_repository.py",
+    "app/repositories/user_repository.py",
+    "app/services/generation_service.py",
+    "tests/integration/test_generation.py",
+    ".omo/evidence/task-5-integer-generator-service.json"
+  ],
+  "preserved_preexisting_work": [
+    ".omo/plans/integer-generator-service.md was already modified before task-5 work and was not edited or staged.",
+    ".omo/evidence/task-4-gate-review.md was already untracked before task-5 work and was not edited or staged.",
+    "Initial and pre-commit Git status are recorded under adversarial.dirty_worktree."
+  ],
+  "baseline": {
+    "initial_worktree_status": [
+      " M .omo/plans/integer-generator-service.md",
+      "?? .omo/evidence/task-4-gate-review.md"
+    ],
+    "command_results": [
+      {
+        "command": "docker compose -p integer-generator-wave2-todo5 up -d --wait db",
+        "exit_code": 0,
+        "result": "PostgreSQL 18 container reported healthy."
+      },
+      {
+        "command": "uv run alembic upgrade head",
+        "exit_code": 0,
+        "result": "Applied revision 0001_initial_catalog."
+      },
+      {
+        "command": "uv run pytest -q",
+        "exit_code": 0,
+        "result": "44 passed, 1 warning in 0.64s."
+      }
+    ]
+  },
+  "implementation": {
+    "admission": "Compatible catalog legs are selected before charging. The existing user row is selected FOR UPDATE; ledger SUM and queued/processing task count are checked while holding the row lock. In one transaction the service inserts a queued task, one unique negative ledger row, the first queued attempt, and current_attempt_id.",
+    "dispatch": "TemporaryProviderPort returns status_code 202 and a deterministic external_id after the admission transaction commits. A second transaction locks the task and attempt and changes both to processing. No provider or network call occurs inside the admission transaction.",
+    "status": "GET /tasks/{id} returns persisted status, current provider leg, output, and attempt entries ordered by attempt number with provider, outcome/error, and created_at. Missing tasks return 404.",
+    "request_semantics": "No Idempotency-Key is added; every successful POST /generate creates a new task."
+  },
+  "automated_verification": {
+    "first_attempt_and_fixes": [
+      {
+        "command": "uv run pytest -q tests/integration/test_generation.py",
+        "exit_code": 1,
+        "result": "Initial new test run failed: the test fixture inserted a user and ledger row without flushing the user first (PostgreSQL FK violation); the unknown-user request also returned 422 because FastAPI's parsed-body path interacted with the strict schema. Fixed by flushing the fixture user before adding ledger data and validating the original JSON bytes with GenerateRequest.model_validate_json."
+      },
+      {
+        "command": "uv run ruff check .",
+        "exit_code": 1,
+        "result": "The first quality pass found unsorted imports and one overlong line. Both were corrected."
+      },
+      {
+        "command": "uv run ruff format --check .",
+        "exit_code": 1,
+        "result": "The first quality pass reported six unformatted files. Formatting was corrected with focused patches."
+      },
+      {
+        "command": "uv run mypy .",
+        "exit_code": 1,
+        "result": "The first quality pass found an optional error_type passed to ProviderOutcome. The mapper now checks for None and handles invalid enum values."
+      }
+    ],
+    "final_commands": [
+      {
+        "command": "uv run pytest -q tests/integration/test_generation.py",
+        "exit_code": 0,
+        "result": "6 passed in 0.55s. Includes the five requested cases and a deterministic concurrent-admission regression."
+      },
+      {
+        "command": "uv run pytest -q",
+        "exit_code": 0,
+        "result": "50 passed, 1 warning in 0.89s. The warning is the existing StarletteDeprecationWarning about using httpx with starlette.testclient."
+      },
+      {
+        "command": "uv run ruff check .",
+        "exit_code": 0,
+        "result": "All checks passed!"
+      },
+      {
+        "command": "uv run ruff format --check .",
+        "exit_code": 0,
+        "result": "51 files already formatted."
+      },
+      {
+        "command": "uv run mypy .",
+        "exit_code": 0,
+        "result": "Success: no issues found in 49 source files."
+      }
+    ],
+    "concurrency": "The concurrent admission test uses two HTTP requests with independent request AsyncSessions and an asyncio.Barrier(2) immediately before the user-row lock; it asserts one 202, one 402, one debit, one task, and one attempt. asyncio.wait_for bounds the test at 5 seconds. No sleep, polling, SQLite, or in-memory database is used."
+  },
+  "manual_http_qa": {
+    "database_setup": {
+      "commands": [
+        {
+          "command": "docker compose -p integer-generator-wave2-todo5 up -d --wait db",
+          "exit_code": 0
+        },
+        {
+          "command": "uv run alembic upgrade head",
+          "exit_code": 0,
+          "result": "Fresh database migrated with revision 0001_initial_catalog."
+        }
+      ]
+    },
+    "server": {
+      "command": "WEBHOOK_SECRET=qa-secret DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/integer_generator uv run uvicorn app.main:app --host 127.0.0.1 --port 8776",
+      "startup_observed_before_requests": "INFO: Application startup complete.",
+      "process_id": 50046,
+      "shutdown": "Ctrl-C; graceful application shutdown and Finished server process [50046]. Exit code 0."
+    },
+    "signed_payment": {
+      "signature_generation": "const { createHmac } = await import('node:crypto'); createHmac('sha256', 'qa-secret').update(body, 'utf8').digest('hex')",
+      "exact_payload": "{\"payment_id\":\"77777777-7777-4777-8777-777777777777\",\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"tokens\":100,\"status\":\"succeeded\"}",
+      "signature": "43478865fc0b220d7ddfbad63f6ac9f7f5c12fa1d46173d63c681c1a144d61c2",
+      "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/webhooks/payments -H 'Content-Type: application/json' -H 'X-Signature: 43478865fc0b220d7ddfbad63f6ac9f7f5c12fa1d46173d63c681c1a144d61c2' --data-binary '{\"payment_id\":\"77777777-7777-4777-8777-777777777777\",\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"tokens\":100,\"status\":\"succeeded\"}'",
+      "exit_code": 0,
+      "raw_response": "HTTP/1.1 204 No Content"
+    },
+    "generation": {
+      "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"image-fast\",\"prompt\":\"task 5 smoke\",\"ref_images\":[]}'",
+      "exit_code": 0,
+      "raw_response": "HTTP/1.1 202 Accepted\n{\"task_id\":\"f4984e82-6295-4e7a-aa54-c32faffc7818\"}",
+      "task_id": "f4984e82-6295-4e7a-aa54-c32faffc7818"
+    },
+    "task_status": {
+      "command": "curl -i --max-time 5 http://127.0.0.1:8776/tasks/f4984e82-6295-4e7a-aa54-c32faffc7818",
+      "exit_code": 0,
+      "raw_response": "HTTP/1.1 200 OK\n{\"task_id\":\"f4984e82-6295-4e7a-aa54-c32faffc7818\",\"status\":\"processing\",\"current_provider\":\"alpha\",\"output\":null,\"history\":[{\"provider\":\"alpha\",\"outcome\":null,\"error\":null,\"created_at\":\"2026-10-21T19:52:25.636633Z\"}]}"
+    },
+    "balance": {
+      "command": "curl -i --max-time 5 http://127.0.0.1:8776/users/66666666-6666-4666-8666-666666666666/balance",
+      "exit_code": 0,
+      "raw_response": "HTTP/1.1 200 OK\n{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"balance\":98,\"history\":[{\"operation\":\"generation\",\"delta\":-2,\"created_at\":\"2026-10-21T19:52:25.636633Z\"},{\"operation\":\"payment\",\"delta\":100,\"created_at\":\"2026-10-21T19:52:20.251277Z\"}]}"
+    },
+    "incompatible_request": {
+      "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"video-long\",\"prompt\":\"three references are incompatible\",\"ref_images\":[\"https://example.com/one.png\",\"https://example.com/two.png\",\"https://example.com/three.png\"]}'",
+      "exit_code": 0,
+      "raw_response": "HTTP/1.1 400 Bad Request\n{\"detail\":\"No compatible provider leg\"}"
+    },
+    "other_rejections": [
+      {
+        "case": "Malformed reference URL",
+        "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"image-fast\",\"prompt\":\"bad ref\",\"ref_images\":[\"not-a-url\"]}'",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 422 Unprocessable Content"
+      },
+      {
+        "case": "Unknown catalog model",
+        "command": "curl -i --max-time 5 -X POST http://127.0.0.1:8776/generate -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"66666666-6666-4666-8666-666666666666\",\"model\":\"unknown-model\",\"prompt\":\"bad model\",\"ref_images\":[]}'",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 400 Bad Request\n{\"detail\":\"No compatible provider leg\"}"
+      },
+      {
+        "case": "Unknown task",
+        "command": "curl -i --max-time 5 http://127.0.0.1:8776/tasks/99999999-9999-4999-8999-999999999999",
+        "exit_code": 0,
+        "raw_response": "HTTP/1.1 404 Not Found\n{\"detail\":\"Task not found\"}"
+      }
+    ],
+    "database_assertions_before_and_after_rejections": {
+      "query": "SELECT COALESCE(SUM(delta),0) AS balance, COUNT(*) AS ledger_rows FROM token_ledger_entries WHERE user_id='66666666-6666-4666-8666-666666666666'; SELECT COUNT(*) AS tasks FROM generation_tasks WHERE user_id='66666666-6666-4666-8666-666666666666'; SELECT COUNT(*) AS attempts FROM generation_attempts WHERE task_id='f4984e82-6295-4e7a-aa54-c32faffc7818';",
+      "before_rejections": {
+        "balance": 98,
+        "ledger_rows": 2,
+        "tasks": 1,
+        "attempts": 1
+      },
+      "after_rejections": {
+        "balance": 98,
+        "ledger_rows": 2,
+        "tasks": 1,
+        "attempts": 1
+      },
+      "task_and_attempt_rows": {
+        "task_id": "f4984e82-6295-4e7a-aa54-c32faffc7818",
+        "task_status": "processing",
+        "current_provider": "alpha",
+        "current_attempt_id": "923e2a53-a02f-4d1c-aab9-5c21206fdc1e",
+        "result_url": null,
+        "attempt_no": 1,
+        "attempt_status": "processing",
+        "external_id": "temporary-alpha-f4984e82-6295-4e7a-aa54-c32faffc7818",
+        "attempt_error": null
+      },
+      "ledger_rows": [
+        {
+          "operation_key": "payment:77777777-7777-4777-8777-777777777777",
+          "delta": 100,
+          "reason": "payment"
+        },
+        {
+          "operation_key": "generation:f4984e82-6295-4e7a-aa54-c32faffc7818:debit",
+          "delta": -2,
+          "reason": "generation"
+        }
+      ]
+    }
+  },
+  "adversarial": {
+    "malformed_input": {
+      "outcome": "PASS",
+      "evidence": "Malformed reference URL returned 422; unknown model and a valid video-long request with three references returned 400. The compatible-leg rejection caused no balance, ledger, task, or attempt change."
+    },
+    "stale_state": {
+      "outcome": "PASS",
+      "evidence": "Balance is recomputed from two ledger deltas (+100 and -2), not a stored balance. PostgreSQL integration tests assert the fourth active request is rejected using three currently queued tasks and that concurrent requests serialize against the current ledger balance."
+    },
+    "dirty_worktree": {
+      "outcome": "PASS",
+      "before_task_changes": [
+        " M .omo/plans/integer-generator-service.md",
+        "?? .omo/evidence/task-4-gate-review.md"
+      ],
+      "before_commit": [
+        " M .omo/plans/integer-generator-service.md",
+        " M app/factory.py",
+        " M app/providers/__init__.py",
+        " M app/repositories/attempt_repository.py",
+        " M app/repositories/generation_catalog_repository.py",
+        " M app/repositories/task_repository.py",
+        " M app/repositories/user_repository.py",
+        "?? .omo/evidence/task-4-gate-review.md",
+        "?? .omo/evidence/task-5-integer-generator-service.json",
+        "?? app/api/controllers/generation.py",
+        "?? app/services/generation_service.py",
+        "?? tests/integration/test_generation.py"
+      ],
+      "preservation": "The plan and task-4 gate report were excluded from staging."
+    },
+    "hung_or_long_commands": {
+      "outcome": "PASS",
+      "evidence": "HTTP requests used curl --max-time 5. The API startup was gated on the Application startup complete event. Tests and Compose operations ran as monitored commands; no foreground sleep or polling loop was used."
+    },
+    "flaky_tests": {
+      "outcome": "PASS",
+      "evidence": "Concurrent admission is coordinated with asyncio.Barrier(2), separate request AsyncSessions, and a bounded asyncio.wait_for. No fixed sleeps or polling."
+    },
+    "misleading_success_output": {
+      "outcome": "PASS",
+      "evidence": "Raw HTTP status/body responses are recorded above and independently matched to PostgreSQL SUM/count/task/attempt rows; rejected requests leave counts and balance unchanged."
+    },
+    "prompt_injection": {
+      "outcome": "N/A",
+      "evidence": "No prompt execution or model integration exists in task 5; TemporaryProviderPort ignores prompt content."
+    },
+    "cancel_resume": {
+      "outcome": "N/A",
+      "evidence": "No resumable flow or cancellation API exists in task 5."
+    },
+    "repeated_interruptions": {
+      "outcome": "N/A",
+      "evidence": "No interruption loop exists in task 5."
+    }
+  },
+  "cleanup": {
+    "api_server": {
+      "pid": 50046,
+      "stop": "Ctrl-C",
+      "exit_code": 0,
+      "receipt": "Application shutdown complete; Finished server process [50046]."
+    },
+    "compose": {
+      "project": "integer-generator-wave2-todo5",
+      "command": "docker compose -p integer-generator-wave2-todo5 down -v",
+      "exit_code": 0,
+      "receipt": "PostgreSQL container, integer-generator-wave2-todo5_postgres-data volume, and default network removed. docker compose ps -a was empty; docker volume ls --filter name=integer-generator-wave2-todo5_postgres-data returned no volume."
+    }
+  },
+  "risks_and_handoffs": [
+    "Todo 6 must replace TemporaryProviderPort with the configurable fake provider services and callback flow. The current GenerationTask schema does not persist prompt/ref_images, and the temporary port receives only provider name and task id; Todo 6 must define payload transport and any persistence needed for failover/replay without holding a database transaction open during provider HTTP.",
+    "Provider callbacks and watchdog behavior are intentionally not implemented in task 5.",
+    "basedpyright diagnostics report a pre-existing error at app/factory.py:18 because Settings() is called without the required webhook_secret field; that line predates this task and the required `uv run mypy .` passes."
+  ]
+}

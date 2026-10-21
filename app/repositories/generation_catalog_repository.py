@@ -26,6 +26,10 @@ class GenerationCatalogRepository:
         """Return a catalog model by its primary key."""
         return await session.get(GenerationModel, model_id)
 
+    async def get_leg(self, session: AsyncSession, leg_id: UUID) -> ProviderLeg | None:
+        """Return one provider leg by its primary key."""
+        return await session.get(ProviderLeg, leg_id)
+
     async def compatible_legs(
         self, session: AsyncSession, model_id: UUID, reference_count: int
     ) -> list[ProviderLeg]:

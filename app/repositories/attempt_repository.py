@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.generation_attempt import GenerationAttempt
+from app.models.generation_model import ProviderLeg
 
 
 class AttemptRepository:
@@ -29,3 +30,29 @@ class AttemptRepository:
             .order_by(GenerationAttempt.attempt_no)
         )
         return list(result.scalars())
+
+    async def for_task_with_providers(
+        self, session: AsyncSession, task_id: UUID
+    ) -> list[tuple[GenerationAttempt, str]]:
+        """Return attempts with provider names in attempt order."""
+        result = await session.execute(
+            select(GenerationAttempt, ProviderLeg.provider_name)
+            .join(ProviderLeg, ProviderLeg.id == GenerationAttempt.provider_leg_id)
+            .where(GenerationAttempt.task_id == task_id)
+            .order_by(GenerationAttempt.attempt_no)
+        )
+        return list(result.tuples())
+
+    async def get_for_update(
+        self, session: AsyncSession, task_id: UUID, attempt_no: int
+    ) -> GenerationAttempt | None:
+        """Return and lock one numbered attempt."""
+        result = await session.execute(
+            select(GenerationAttempt)
+            .where(
+                GenerationAttempt.task_id == task_id,
+                GenerationAttempt.attempt_no == attempt_no,
+            )
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()
