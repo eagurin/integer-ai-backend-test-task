@@ -13,11 +13,14 @@ from app.api.schemas.generation import (
     TaskStatusResponse,
 )
 from app.database import get_session
+from app.dependencies import get_generation_service
 from app.services.generation_service import GenerationService
 
 router = APIRouter()
-service = GenerationService()
 SessionDependency = Annotated[AsyncSession, Depends(get_session)]
+GenerationServiceDependency = Annotated[
+    GenerationService, Depends(get_generation_service)
+]
 
 
 @router.post(
@@ -35,7 +38,11 @@ SessionDependency = Annotated[AsyncSession, Depends(get_session)]
         }
     },
 )
-async def generate(request: Request, session: SessionDependency) -> GenerateResponse:
+async def generate(
+    request: Request,
+    session: SessionDependency,
+    service: GenerationServiceDependency,
+) -> GenerateResponse:
     """Create one new generation order and return its task identifier."""
     try:
         generation_request = GenerateRequest.model_validate_json(await request.body())
@@ -46,7 +53,7 @@ async def generate(request: Request, session: SessionDependency) -> GenerateResp
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
 async def get_task_status(
-    task_id: UUID, session: SessionDependency
+    task_id: UUID, session: SessionDependency, service: GenerationServiceDependency
 ) -> TaskStatusResponse:
     """Return current task state and timestamped provider attempts."""
     return await service.status(session, task_id)

@@ -7,17 +7,20 @@ from uuid import UUID, uuid4
 import anyio
 import httpx
 import pytest
-from app.api.controllers.generation import service
 from app.factory import create_app
 from app.models.generation_attempt import GenerationAttempt
 from app.models.generation_model import GenerationModel
 from app.models.generation_task import GenerationTask
 from app.models.token_ledger_entry import TokenLedgerEntry
 from app.models.user import User
+from app.providers import TemporaryProviderPort
+from app.services.generation_service import GenerationService
 from app.settings import Settings
 from pydantic import SecretStr
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+service = GenerationService(TemporaryProviderPort())
 
 
 async def client_for(
@@ -28,6 +31,7 @@ async def client_for(
     cleanup = AsyncExitStack()
     await cleanup.enter_async_context(application.router.lifespan_context(application))
     application.state.session_factory = session_factory
+    application.state.generation_service = service
     client = httpx.AsyncClient(
         transport=httpx.ASGITransport(app=application, raise_app_exceptions=False),
         base_url="http://test",
@@ -142,6 +146,8 @@ async def test_valid_request_debits_once_and_returns_task_id(
 
         assert task is not None
         assert task.status == "processing"
+        assert task.prompt == "A geometric landscape"
+        assert task.ref_images == []
         assert task.current_provider_leg_id is not None
         assert attempt is not None
         assert task.current_attempt_id == attempt.id

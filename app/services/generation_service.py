@@ -12,10 +12,11 @@ from app.api.schemas.generation import (
     TaskStatus,
     TaskStatusResponse,
 )
+from app.api.schemas.webhooks import ProviderWebhookRequest
 from app.models.generation_attempt import GenerationAttempt
 from app.models.generation_task import GenerationTask
 from app.models.token_ledger_entry import TokenLedgerEntry
-from app.providers import TemporaryProviderPort
+from app.providers import GenerationInput, ProviderPort, TemporaryProviderPort
 from app.repositories.attempt_repository import AttemptRepository
 from app.repositories.generation_catalog_repository import (
     GenerationCatalogRepository,
@@ -23,18 +24,23 @@ from app.repositories.generation_catalog_repository import (
 from app.repositories.task_repository import TaskRepository
 from app.repositories.token_ledger_repository import TokenLedgerRepository
 from app.repositories.user_repository import UserRepository
+from app.services.provider_callback_service import (
+    AttemptDispatch,
+    ProviderCallbackService,
+)
 
 
 class GenerationService:
     """Validates and persists generation work before calling the provider port."""
 
-    def __init__(self) -> None:
+    def __init__(self, provider: ProviderPort | None = None) -> None:
         self.users = UserRepository()
         self.catalog = GenerationCatalogRepository()
         self.tasks = TaskRepository()
         self.attempts = AttemptRepository()
         self.ledger = TokenLedgerRepository()
-        self.provider = TemporaryProviderPort()
+        self.provider = provider or TemporaryProviderPort()
+        self.callbacks = ProviderCallbackService()
 
     async def submit(self, session: AsyncSession, request: GenerateRequest) -> UUID:
         """Admit a task and debit in one transaction, then dispatch outside it."""
@@ -73,6 +79,8 @@ class GenerationService:
                 generation_model_id=model.id,
                 status="queued",
                 current_provider_leg_id=first_leg.id,
+                prompt=request.prompt,
+                ref_images=[str(image) for image in request.ref_images],
             )
             await self.tasks.add(session, task)
             await self.ledger.append(
@@ -97,20 +105,55 @@ class GenerationService:
             task.current_attempt_id = attempt_id
             await session.flush()
 
-        acceptance = await self.provider.submit(first_leg.provider_name, task_id)
-        if acceptance.status_code == 202:
-            async with session.begin():
-                accepted_task = await self.tasks.get_for_update(session, task_id)
-                accepted_attempt = await self.attempts.get_for_update(
-                    session, task_id, 1
-                )
-                if accepted_task is not None and accepted_attempt is not None:
-                    accepted_task.status = "processing"
-                    accepted_attempt.status = "processing"
-                    accepted_attempt.external_id = acceptance.external_id
-                    await session.flush()
+        await self.dispatch(
+            session,
+            AttemptDispatch(
+                provider=first_leg.provider_name,
+                generation=GenerationInput(
+                    task_id=task_id,
+                    attempt_no=1,
+                    prompt=request.prompt,
+                    ref_images=tuple(str(image) for image in request.ref_images),
+                ),
+            ),
+        )
 
         return task_id
+
+    async def dispatch(self, session: AsyncSession, dispatch: AttemptDispatch) -> None:
+        """Send committed work outside the transaction and record its response."""
+        generation = dispatch.generation
+        acceptance = await self.provider.submit(dispatch.provider, generation)
+        if acceptance.status_code == 202:
+            async with session.begin():
+                task = await self.tasks.get_for_update(session, generation.task_id)
+                attempt = await self.attempts.get_for_update(
+                    session, generation.task_id, generation.attempt_no
+                )
+                if (
+                    task is not None
+                    and attempt is not None
+                    and task.current_attempt_id == attempt.id
+                    and task.status not in {"succeeded", "failed"}
+                ):
+                    task.status = "processing"
+                    attempt.status = "processing"
+                    attempt.external_id = acceptance.external_id
+            return
+
+        async with session.begin():
+            next_dispatch = await self.callbacks.apply(
+                session,
+                dispatch.provider,
+                ProviderWebhookRequest(
+                    task_id=generation.task_id,
+                    attempt_no=generation.attempt_no,
+                    outcome=ProviderOutcome.TECHNICAL_ERROR,
+                    error=f"sync_{acceptance.status_code}",
+                ),
+            )
+        if next_dispatch is not None:
+            await self.dispatch(session, next_dispatch)
 
     async def status(self, session: AsyncSession, task_id: UUID) -> TaskStatusResponse:
         """Return stored task state and provider attempt history."""

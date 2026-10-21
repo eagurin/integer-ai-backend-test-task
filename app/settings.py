@@ -13,6 +13,10 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator"
     )
     webhook_secret: SecretStr = Field(validation_alias="WEBHOOK_SECRET")
+    provider_alpha_url: str = "http://127.0.0.1:9101"
+    provider_beta_url: str = "http://127.0.0.1:9102"
+    provider_callback_url: str = "http://127.0.0.1:8000/webhooks/providers"
+    provider_request_timeout: float = Field(default=2.0, gt=0)
 
     @field_validator("webhook_secret")
     @classmethod

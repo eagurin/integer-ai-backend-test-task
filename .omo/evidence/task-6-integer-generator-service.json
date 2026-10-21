@@ -1,0 +1,372 @@
+{
+  "task": 6,
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+  "date": "2026-10-21",
+  "base": {
+    "required_head": "b25bf4e0885ca4cee2c787edd024db712efa719d",
+    "previous_task_commit": "00150433425f641fd5bdb576b9ee6b45216569b9",
+    "branch": "work/integer-generator-service-wave-2"
+  },
+  "changed_files": [
+    "alembic/versions/0002_generation_input.py",
+    "app/api/controllers/generation.py",
+    "app/api/controllers/providers.py",
+    "app/dependencies.py",
+    "app/factory.py",
+    "app/models/generation_task.py",
+    "app/providers/__init__.py",
+    "app/providers/alpha.py",
+    "app/providers/beta.py",
+    "app/providers/fake_app.py",
+    "app/providers/http_client.py",
+    "app/services/generation_service.py",
+    "app/services/provider_callback_service.py",
+    "app/settings.py",
+    "pyproject.toml",
+    "tests/__init__.py",
+    "tests/integration/provider_helpers.py",
+    "tests/integration/test_fake_provider_apps.py",
+    "tests/integration/test_generation.py",
+    "tests/integration/test_generation_input.py",
+    "tests/integration/test_provider_callbacks.py",
+    "tests/integration/test_provider_dispatch_crash_window.py",
+    "tests/integration/test_webhook_signatures.py",
+    "tests/unit/test_fake_provider_configuration.py",
+    "tests/unit/test_provider_http_client.py",
+    "uv.lock"
+  ],
+  "dependency_change": {
+    "reason": "The production provider client and fake provider applications import httpx.AsyncClient; httpx was moved from the dev group to runtime dependencies.",
+    "commands": [
+      {
+        "command": "uv lock",
+        "exit_code": 0,
+        "result": "Resolved 44 packages in 871ms."
+      },
+      {
+        "command": "uv sync --locked",
+        "exit_code": 0,
+        "result": "Resolved 44 packages in 17ms; checked 43 packages in 15ms."
+      }
+    ]
+  },
+  "automated_checks": [
+    {
+      "command": "docker compose -p integer-generator-wave2-todo6 up -d db",
+      "exit_code": 0,
+      "result": "Created network integer-generator-wave2-todo6_default, volume integer-generator-wave2-todo6_postgres-data, and container integer-generator-wave2-todo6-db-1; health reached READY."
+    },
+    {
+      "command": "uv run alembic upgrade head && uv run alembic current",
+      "exit_code": 0,
+      "result": "Applied 0001_initial_catalog and 0002_generation_input; current revision 0002_generation_input (head)."
+    },
+    {
+      "command": "uv run pytest -q tests/integration/test_provider_callbacks.py::test_first_provider_failure_succeeds_on_second_with_two_attempts tests/integration/test_provider_callbacks.py::test_moderation_skips_flagged_leg",
+      "exit_code": 0,
+      "result": "2 passed in 0.35s."
+    },
+    {
+      "command": "uv run pytest -q tests/integration/test_provider_callbacks.py::test_sync_503_and_timeout_fail_over tests/integration/test_provider_callbacks.py::test_payload_failure_is_terminal tests/integration/test_provider_callbacks.py::test_10_concurrent_final_leg_failures_refund_once tests/integration/test_webhook_signatures.py::test_invalid_provider_signature_changes_no_task_state tests/integration/test_provider_callbacks.py::test_rollback_before_callback_commit_preserves_attempt",
+      "exit_code": 0,
+      "result": "5 passed in 0.46s."
+    },
+    {
+      "command": "uv run pytest -q tests/unit/test_fake_provider_configuration.py tests/unit/test_provider_http_client.py tests/integration/test_provider_dispatch_crash_window.py",
+      "exit_code": 0,
+      "result": "9 passed in 0.25s; deterministic fake modes cover failure probability/type, overlapping duplicate callbacks, omitted callbacks, late-completion delay selection, sync 503, and sync timeout."
+    },
+    {
+      "command": "uv run pytest -q tests/integration/test_provider_dispatch_crash_window.py",
+      "exit_code": 0,
+      "result": "1 passed in 0.38s; one committed task/attempt and debit remained after repeated dispatch interruption and recovered through a later accepted dispatch and callback."
+    },
+    {
+      "command": "uv run pytest -q",
+      "exit_code": 0,
+      "result": "73 passed, 1 warning. The warning is StarletteDeprecationWarning from the existing starlette.testclient import of httpx."
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "result": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "result": "68 files already formatted."
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "result": "Success: no issues found in 65 source files."
+    },
+    {
+      "command": "docker compose config -q",
+      "exit_code": 0,
+      "result": "No output; Compose configuration accepted."
+    }
+  ],
+  "live_http_qa": {
+    "project": "integer-generator-wave2-todo6",
+    "services": {
+      "api": "http://127.0.0.1:64528",
+      "alpha": "http://127.0.0.1:64529",
+      "beta": "http://127.0.0.1:64530"
+    },
+    "curl_bound": "--max-time 5 for every curl request",
+    "literal_curl_commands": [
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{\"task_id\":\"ed89a1e6-4806-4e0d-8a12-7b90b2ee878f\",\"attempt_no\":1,\"prompt\":\"manual provider contract final\",\"ref_images\":[],\"callback_url\":\"http://127.0.0.1:64528/webhooks/providers\",\"callback_secret\":\"todo6-live-provider-secret\"}' 'http://127.0.0.1:64529/tasks'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{\"task_id\":\"ed89a1e6-4806-4e0d-8a12-7b90b2ee878f\",\"attempt_no\":1,\"prompt\":\"manual provider contract final\",\"ref_images\":[],\"callback_url\":\"http://127.0.0.1:64528/webhooks/providers\",\"callback_secret\":\"todo6-live-provider-secret\"}' 'http://127.0.0.1:64530/tasks'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: 9927a42eb44bf5c8d9b2b3df236c6067936009b2b6b81d806bbcb5fb9cd7c530' --data-binary '{\"payment_id\":\"4b586dd8-f015-48fb-aa45-24980c0cc731\",\"user_id\":\"4b586dd8-f015-48fb-aa45-24980c0cc730\",\"tokens\":50,\"status\":\"succeeded\"}' 'http://127.0.0.1:64528/webhooks/payments'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"4b586dd8-f015-48fb-aa45-24980c0cc730\",\"model\":\"image-fast\",\"prompt\":\"Live HTTP failover verification\",\"ref_images\":[]}' 'http://127.0.0.1:64528/generate'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: 3bdd7e4a7877066a8dcb8a048985a04c685834e6b4fdf18e0c02d45a5d2c7821' --data-binary '{\"task_id\":\"eabb29e0-b5a1-4b6d-ab98-e8cd921b7262\",\"attempt_no\":1,\"outcome\":\"technical_error\",\"error\":\"technical_error\"}' 'http://127.0.0.1:64528/webhooks/providers/alpha'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: e50fa5c20565fb20ccf0a8a661a464dbeaf625c5e8b675e490dc865bed16912d' --data-binary '{\"task_id\":\"eabb29e0-b5a1-4b6d-ab98-e8cd921b7262\",\"attempt_no\":2,\"outcome\":\"completed\",\"output\":\"https://provider.example/live.png\"}' 'http://127.0.0.1:64528/webhooks/providers/beta'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: ad049498bca76a60bd1b910a8887cee55611d081c8949f909735defff29dd10d' --data-binary '{\"task_id\":\"eabb29e0-b5a1-4b6d-ab98-e8cd921b7262\",\"attempt_no\":1,\"outcome\":\"payload\",\"error\":\"payload\"}' 'http://127.0.0.1:64528/webhooks/providers/alpha'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{\"user_id\":\"4b586dd8-f015-48fb-aa45-24980c0cc730\",\"model\":\"image-fast\",\"prompt\":\"Live terminal payload verification\",\"ref_images\":[]}' 'http://127.0.0.1:64528/generate'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: ab6a1c19180b7a0566d69e611cf473eb0015dd46cd63c2a5df7aea4077e4465d' --data-binary '{\"task_id\":\"3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c\",\"attempt_no\":1,\"outcome\":\"payload\",\"error\":\"payload\"}' 'http://127.0.0.1:64528/webhooks/providers/alpha'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: e50fa5c20565fb20ccf0a8a661a464dbeaf625c5e8b675e490dc865bed16912d' --data-binary '{\"task_id\":\"eabb29e0-b5a1-4b6d-ab98-e8cd921b7262\",\"attempt_no\":2,\"outcome\":\"completed\",\"output\":\"https://provider.example/live.png\"}' 'http://127.0.0.1:64528/webhooks/providers/beta'",
+      "curl -sS --max-time 5 -w '\\nHTTP_STATUS=%{http_code}' -X POST -H 'Content-Type: application/json' -H 'X-Signature: ab6a1c19180b7a0566d69e611cf473eb0015dd46cd63c2a5df7aea4077e4465d' --data-binary '{\"task_id\":\"3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c\",\"attempt_no\":1,\"outcome\":\"payload\",\"error\":\"payload\"}' 'http://127.0.0.1:64528/webhooks/providers/alpha'"
+    ],
+    "database_query_commands": [
+      "docker compose -p integer-generator-wave2-todo6 exec -T db psql -U postgres -d integer_generator -Atc \"SELECT status || '|' || (SELECT count(*) FROM generation_attempts WHERE task_id='eabb29e0-b5a1-4b6d-ab98-e8cd921b7262') || '|' || (SELECT count(*) FROM token_ledger_entries WHERE operation_key='generation:' || 'eabb29e0-b5a1-4b6d-ab98-e8cd921b7262' || ':refund') FROM generation_tasks WHERE id='eabb29e0-b5a1-4b6d-ab98-e8cd921b7262'\"",
+      "docker compose -p integer-generator-wave2-todo6 exec -T db psql -U postgres -d integer_generator -Atc \"SELECT t.status || '|' || coalesce(t.result_url,'NULL') || '|' || count(a.id) || '|' || string_agg(a.attempt_no || ':' || a.status || ':' || coalesce(a.error_type,''), ',' ORDER BY a.attempt_no) || '|' || (SELECT count(*) FROM token_ledger_entries l WHERE l.operation_key='generation:' || t.id || ':refund') FROM generation_tasks t JOIN generation_attempts a ON a.task_id=t.id WHERE t.id='eabb29e0-b5a1-4b6d-ab98-e8cd921b7262' GROUP BY t.id\"",
+      "docker compose -p integer-generator-wave2-todo6 exec -T db psql -U postgres -d integer_generator -Atc \"SELECT t.status || '|' || count(a.id) || '|' || (SELECT count(*) FROM token_ledger_entries l WHERE l.operation_key='generation:' || t.id || ':refund') || '|' || (SELECT sum(delta) FROM token_ledger_entries l WHERE l.user_id=t.user_id) FROM generation_tasks t JOIN generation_attempts a ON a.task_id=t.id WHERE t.id='3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c' GROUP BY t.id\""
+    ],
+    "provider_task_payload": {
+      "task_id": "ed89a1e6-4806-4e0d-8a12-7b90b2ee878f",
+      "attempt_no": 1,
+      "prompt": "manual provider contract final",
+      "ref_images": [],
+      "callback_url": "http://127.0.0.1:64528/webhooks/providers",
+      "callback_secret": "todo6-live-provider-secret",
+      "alpha": {
+        "raw_status": 202,
+        "raw_body": "{\"external_id\":\"alpha-a227e40e-c6d4-48e4-b13e-eef2e0ec5b3d\"}"
+      },
+      "beta": {
+        "raw_status": 202,
+        "raw_body": "{\"external_id\":\"beta-1a5c8273-7b68-45c5-ad3a-93c492948500\"}"
+      }
+    },
+    "payment_setup": {
+      "payload": {
+        "payment_id": "4b586dd8-f015-48fb-aa45-24980c0cc731",
+        "user_id": "4b586dd8-f015-48fb-aa45-24980c0cc730",
+        "tokens": 50,
+        "status": "succeeded"
+      },
+      "signature": "valid lowercase HMAC-SHA256 over the exact compact JSON request bytes",
+      "raw_status": 204,
+      "raw_body": "",
+      "balance_response": {
+        "raw_status": 200,
+        "raw_body": "{\"user_id\":\"4b586dd8-f015-48fb-aa45-24980c0cc730\",\"balance\":50,\"history\":[{\"operation\":\"payment\",\"delta\":50,\"created_at\":\"2026-10-21T21:43:04.831519Z\"}]}"
+      }
+    },
+    "success_path": {
+      "generate_payload": {
+        "user_id": "4b586dd8-f015-48fb-aa45-24980c0cc730",
+        "model": "image-fast",
+        "prompt": "Live HTTP failover verification",
+        "ref_images": []
+      },
+      "generate_response": {
+        "raw_status": 202,
+        "raw_body": "{\"task_id\":\"eabb29e0-b5a1-4b6d-ab98-e8cd921b7262\"}"
+      },
+      "database_before_callbacks": "processing|1|0",
+      "callbacks": [
+        {
+          "provider": "alpha",
+          "attempt_no": 1,
+          "outcome": "technical_error",
+          "raw_status": 204,
+          "raw_body": ""
+        },
+        {
+          "provider": "beta",
+          "attempt_no": 2,
+          "outcome": "completed",
+          "output": "https://provider.example/live.png",
+          "raw_status": 204,
+          "raw_body": ""
+        },
+        {
+          "provider": "beta",
+          "attempt_no": 2,
+          "outcome": "completed",
+          "duplicate": true,
+          "raw_status": 204,
+          "raw_body": ""
+        },
+        {
+          "provider": "alpha",
+          "attempt_no": 1,
+          "outcome": "payload",
+          "stale": true,
+          "raw_status": 204,
+          "raw_body": ""
+        }
+      ],
+      "database_after_callbacks": "succeeded|https://provider.example/live.png|2|1:failed:technical_error,2:succeeded:|0"
+    },
+    "terminal_failure_path": {
+      "generate_payload": {
+        "user_id": "4b586dd8-f015-48fb-aa45-24980c0cc730",
+        "model": "image-fast",
+        "prompt": "Live terminal payload verification",
+        "ref_images": []
+      },
+      "generate_response": {
+        "raw_status": 202,
+        "raw_body": "{\"task_id\":\"3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c\"}"
+      },
+      "callback_payload": {
+        "task_id": "3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c",
+        "attempt_no": 1,
+        "outcome": "payload",
+        "error": "payload"
+      },
+      "first_callback": {
+        "raw_status": 204,
+        "raw_body": ""
+      },
+      "duplicate_callback": {
+        "raw_status": 204,
+        "raw_body": ""
+      },
+      "database_after_callbacks": "failed|1|1|48"
+    }
+  },
+  "manual_qa_matrix": [
+    {
+      "scenario": "Alpha provider accepts a task",
+      "command": "curl -sS --max-time 5 POST http://127.0.0.1:64529/tasks",
+      "expected": "HTTP 202 with external_id",
+      "observed": "HTTP 202; alpha-a227e40e-c6d4-48e4-b13e-eef2e0ec5b3d",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "Beta provider accepts a task",
+      "command": "curl -sS --max-time 5 POST http://127.0.0.1:64530/tasks",
+      "expected": "HTTP 202 with external_id",
+      "observed": "HTTP 202; beta-1a5c8273-7b68-45c5-ad3a-93c492948500",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "Signed API callback failover, duplicate, and stale deliveries",
+      "command": "Signed curl --max-time 5 callbacks to /webhooks/providers/alpha and /webhooks/providers/beta",
+      "expected": "All callbacks return 204; alpha technical failure advances to beta; duplicate and stale callbacks do not alter settled state",
+      "observed": "All four returned 204; PostgreSQL showed succeeded, two attempts in order, result URL retained, zero refunds",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "Signed terminal payload failure and duplicate",
+      "command": "Signed curl --max-time 5 payload callback twice for task 3b0969cb-6551-4bb5-ae7e-adf0a72a0c6c",
+      "expected": "Both return 204; task fails with one attempt and one refund",
+      "observed": "Both returned 204; DB returned failed|1|1|48",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "PostgreSQL failover, moderation, sync failure, payload and refund behavior",
+      "command": "Required two uv run pytest -q tests/integration/test_provider_callbacks.py scenarios",
+      "expected": "All seven required PostgreSQL cases pass",
+      "observed": "2 passed and 5 passed in the separate required command groups",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "Malformed provider requests and callback signatures",
+      "command": "uv run pytest -q tests/unit/test_fake_provider_configuration.py tests/integration/test_webhook_signatures.py::test_malformed_signed_provider_callback_changes_no_task_state tests/integration/test_webhook_signatures.py::test_invalid_provider_signature_changes_no_task_state",
+      "expected": "Malformed signed callback returns 422; invalid signature returns 401 without state mutation",
+      "observed": "Both cases passed; provider task schema rejects invalid UUID/attempt number with 422",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    },
+    {
+      "scenario": "QA resource cleanup",
+      "command": "docker compose -p integer-generator-wave2-todo6 down --volumes --remove-orphans plus project label, port, and curl probes",
+      "expected": "No project containers/network/volume or API/provider listeners remain",
+      "observed": "All project resource queries returned no output; ports 64528-64530 had no listeners; HTTP probes were unreachable",
+      "verdict": "PASS",
+      "artifact": ".omo/evidence/task-6-integer-generator-service.json"
+    }
+  ],
+  "adversarial_probes": {
+    "malformed_fake_provider_task": "Passed: invalid UUID and attempt_no=0 returned 422.",
+    "fake_provider_configuration": "Passed: six deterministic unit cases verify probability 0/1 and selected failure type, overlapping duplicate callbacks, omitted callbacks, late-completion delay selection, synchronous 503, and synchronous timeout 504.",
+    "malformed_signed_callback": "Passed: signed attempt_no=0/unknown outcome returned 422; task remained processing with one attempt.",
+    "invalid_callback_signature": "Passed: returned 401 before task or ledger mutation.",
+    "stale_duplicate_out_of_order": "Passed: valid callbacks returned 204; only the current attempt changed task state; one refund maximum.",
+    "dirty_worktree_preservation": "Initial and current status show the pre-existing modified .omo/plans/integer-generator-service.md and untracked .omo/evidence/task-4-gate-review.md and .omo/evidence/task-5-code-review.md; none are task-6 files.",
+    "bounded_commands": "Curl uses --max-time 5; pytest commands use a 300-second process deadline; full quality commands use a 600-second process deadline.",
+    "test_determinism": "Concurrency uses an AnyIO event barrier and fail_after(10); no test uses sleep or polling delays. Fake provider HTTP callbacks were omitted for direct live route verification.",
+    "http_database_reconciliation": "Passed: provider/API HTTP statuses and bodies were compared with PostgreSQL task, attempt, refund, and ledger balance queries recorded above.",
+    "repeated_dispatch_interruption": "Passed: integration test observes HTTP 500 after simulated transport interruption, retains one queued task/attempt and balance 98 after two retries, then recovers via accepted dispatch and signed completion.",
+    "callback_transaction_rollback": "Passed: forced pre-commit exception returned 500 and a subsequent DB read showed the task and attempt remained processing; retry behavior remained available.",
+    "prompt_injection": "N/A: no LLM or agent consumes prompt text; generation prompts are persisted and forwarded as opaque provider input.",
+    "cancel_resume": "N/A: this service exposes request/callback operations, not cancellable long-running agent sessions."
+  },
+  "cleanup_receipts": {
+    "status": "complete",
+    "actions": [
+      {
+        "action": "Stop live API, alpha, and beta uvicorn sessions.",
+        "sessions": [
+          "bash_129",
+          "bash_127",
+          "bash_128"
+        ],
+        "result": "Final API/alpha/beta sessions were killed; listener check confirmed ports 64528, 64529, and 64530 are free."
+      },
+      {
+        "command": "docker compose -p integer-generator-wave2-todo6 down --volumes --remove-orphans",
+        "exit_code": 0,
+        "result": "Final cleanup removed container integer-generator-wave2-todo6-db-1, volume integer-generator-wave2-todo6_postgres-data, and network integer-generator-wave2-todo6_default."
+      }
+    ],
+    "verification": [
+      {
+        "command": "docker ps -a --filter label=com.docker.compose.project=integer-generator-wave2-todo6 --format '{{.Names}}'",
+        "exit_code": 0,
+        "result": "No output; no project containers remain."
+      },
+      {
+        "command": "docker network ls --filter label=com.docker.compose.project=integer-generator-wave2-todo6 --format '{{.Name}}'",
+        "exit_code": 0,
+        "result": "No output; no project network remains."
+      },
+      {
+        "command": "docker volume ls --filter label=com.docker.compose.project=integer-generator-wave2-todo6 --format '{{.Name}}'",
+        "exit_code": 0,
+        "result": "No output; no project volume remains."
+      },
+      {
+        "command": "for port in 64528 64529 64530; do if lsof -nP -iTCP:$port -sTCP:LISTEN >/dev/null 2>&1; then echo \"LISTENER_REMAINS:$port\"; exit 1; else echo \"NO_LISTENER:$port\"; fi; done",
+        "exit_code": 0,
+        "result": "NO_LISTENER on ports 64528, 64529, and 64530."
+      },
+      {
+        "command": "for url in http://127.0.0.1:64528/healthz http://127.0.0.1:64529/openapi.json http://127.0.0.1:64530/openapi.json; do if curl -fsS --max-time 1 \"$url\" >/dev/null 2>&1; then echo \"HTTP_STILL_REACHABLE:$url\"; exit 1; else echo \"HTTP_UNREACHABLE:$url\"; fi; done",
+        "exit_code": 0,
+        "result": "All three bounded probes reported HTTP_UNREACHABLE."
+      }
+    ]
+  },
+  "risks": [
+    "The next planned watchdog task owns automatic recovery after process death between attempt commit and provider HTTP; this task verifies persistence/retry behavior but does not add the watchdog.",
+    "The fake provider supports late completion configuration; coordination with a committed watchdog timeout remains owned by the next task."
+  ],
+  "preexisting_warning": "One StarletteDeprecationWarning is emitted by the existing starlette.testclient integration in the installed FastAPI/Starlette stack recommending httpx2; no test failed.",
+  "diagnostic_observation": "Workspace LSP/basedpyright reported unresolved imports for modules present in this alternate worktree and Settings constructor diagnostics in existing factory/settings tests; the target-worktree mypy run passed, all imports executed in pytest, and all three live Uvicorn apps started successfully.",
+  "commit": {
+    "status": "pending",
+    "required_message": "feat(providers): route signed outcomes through the eligible next leg",
+    "hash": null
+  }
+}

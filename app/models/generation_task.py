@@ -12,6 +12,7 @@ from sqlalchemy import (
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -66,6 +67,8 @@ class GenerationTask(Base):
         nullable=True,
     )
     result_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    prompt: Mapped[str] = mapped_column(String(10000), nullable=False, default="")
+    ref_images: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
