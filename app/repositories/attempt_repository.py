@@ -56,3 +56,17 @@ class AttemptRepository:
             .with_for_update()
         )
         return result.scalar_one_or_none()
+
+    async def get_current_for_update(
+        self, session: AsyncSession, task_id: UUID, attempt_id: UUID
+    ) -> GenerationAttempt | None:
+        """Lock the task's current attempt after its task row is locked."""
+        result = await session.execute(
+            select(GenerationAttempt)
+            .where(
+                GenerationAttempt.id == attempt_id,
+                GenerationAttempt.task_id == task_id,
+            )
+            .with_for_update()
+        )
+        return result.scalar_one_or_none()

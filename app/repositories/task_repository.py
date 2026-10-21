@@ -1,10 +1,12 @@
 """Generation task persistence queries."""
 
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.generation_attempt import GenerationAttempt
 from app.models.generation_task import GenerationTask
 
 
@@ -41,3 +43,34 @@ class TaskRepository:
             )
         )
         return int(result.scalar_one())
+
+    async def due_for_watchdog(
+        self,
+        session: AsyncSession,
+        now: datetime,
+        batch_size: int,
+    ) -> list[GenerationTask]:
+        """Claim due tasks while skipping tasks locked by other workers."""
+        result = await session.scalars(
+            select(GenerationTask)
+            .join(
+                GenerationAttempt,
+                and_(
+                    GenerationAttempt.id == GenerationTask.current_attempt_id,
+                    GenerationAttempt.task_id == GenerationTask.id,
+                ),
+            )
+            .where(
+                GenerationTask.status.in_(("queued", "processing")),
+                GenerationAttempt.status.in_(("queued", "processing")),
+                GenerationAttempt.deadline_at <= now,
+            )
+            .order_by(
+                GenerationAttempt.deadline_at,
+                GenerationTask.created_at,
+                GenerationTask.id,
+            )
+            .limit(batch_size)
+            .with_for_update(of=GenerationTask, skip_locked=True)
+        )
+        return list(result.all())

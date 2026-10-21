@@ -7,9 +7,11 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     String,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PostgreSQLUUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,6 +29,13 @@ class GenerationAttempt(Base):
         CheckConstraint(
             "status IN ('queued', 'processing', 'succeeded', 'failed', 'timed_out')",
             name="valid_status",
+        ),
+        Index(
+            "ix_generation_attempts_unresolved_deadline",
+            "deadline_at",
+            postgresql_where=text(
+                "status IN ('queued', 'processing') AND deadline_at IS NOT NULL"
+            ),
         ),
     )
 
@@ -53,5 +62,8 @@ class GenerationAttempt(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    deadline_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

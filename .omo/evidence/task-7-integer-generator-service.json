@@ -1,0 +1,151 @@
+{
+  "task": 7,
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+  "base": {
+    "task_6_feature": "5a02dc9dc3adc8b28876e6eb3844d19984a81e8d",
+    "task_6_evidence": "08311068f8a8e35597171c739ef09a562c7ca9f2",
+    "task_6_gate_review": "37f3f12a935f7b4877ac703215d9e2729b1985b8"
+  },
+  "implementation": [
+    "Each provider attempt stores its deadline before provider HTTP dispatch.",
+    "Production app.main starts a bounded AnyIO watchdog from each worker lifespan; app factory defaults off for in-process tests.",
+    "Due tasks are selected in bounded batches with FOR UPDATE OF generation_tasks SKIP LOCKED.",
+    "Watchdog and callback lock the task before locking the current attempt; timeout, failover creation, or refund commit transactionally.",
+    "A partial PostgreSQL index covers unresolved attempt deadlines; migration backfills active attempts using the 60-second default.",
+    "Four PostgreSQL integration tests cover late completion, concurrent ticks, provider silence, and dispatch crash recovery."
+  ],
+  "commands": [
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "uv lock",
+      "exit_code": 0,
+      "result": "Resolved 44 packages."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "uv sync --locked",
+      "exit_code": 0,
+      "result": "Locked environment synchronized."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "docker compose -p integer-generator-wave2-todo7 up -d db",
+      "exit_code": 0,
+      "result": "Fresh project network, postgres-data volume, and PostgreSQL 18 container started."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic upgrade head",
+      "exit_code": 0,
+      "result": "Revisions 0001_initial_catalog, 0002_generation_input, and 0003_provider_attempt_deadlines applied."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q tests/integration/test_watchdog.py::test_late_completed_after_watchdog_commit_is_ignored tests/integration/test_watchdog.py::test_concurrent_watchdogs_claim_task_once tests/integration/test_watchdog.py::test_provider_silence_times_out_and_fails_over tests/integration/test_watchdog.py::test_crash_before_provider_post_times_out_and_fails_over",
+      "exit_code": 0,
+      "result": "4 passed in 0.65s after test-support extraction."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q",
+      "exit_code": 0,
+      "result": "78 passed, 1 warning in 2.91s. Warning: existing Starlette TestClient/httpx deprecation."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "result": "All checks passed."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "result": "74 files already formatted."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "result": "Success: no issues found in 69 source files."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "docker compose config -q",
+      "exit_code": 0,
+      "result": "No output; valid configuration."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic current",
+      "exit_code": 0,
+      "result": "0003_provider_attempt_deadlines (head); pg_indexes confirmed ix_generation_attempts_unresolved_deadline on deadline_at with queued/processing and non-null predicate."
+    }
+  ],
+  "resolved_verification_failures": [
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q",
+      "exit_code": 1,
+      "result": "1 failed, 77 passed; a watchdog assertion expected one global due row but persisted unresolved attempts from earlier tests were also due.",
+      "resolution": "The deadline test helper now defers unrelated active attempts in the dedicated Compose test database before expiring its target task. The four named tests and full suite pass afterward."
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 1,
+      "result": "Initially reported an unused datetime import and unsorted imports; after helper extraction it reported one additional import-order issue.",
+      "resolution": "Removed the unused import and applied Ruff's import ordering; final lint exits 0."
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 1,
+      "result": "Initially identified two formatting differences.",
+      "resolution": "Applied the required formatting; final format check exits 0."
+    }
+  ],
+  "live_api_postgresql_qa": {
+    "processes": {
+      "api": "uvicorn app.main:app on 127.0.0.1:8000; lifespan watchdog enabled; startup completed.",
+      "alpha": "uvicorn app.providers.alpha:app on 127.0.0.1:9101; startup completed.",
+      "beta": "uvicorn app.providers.beta:app on 127.0.0.1:9102; startup completed."
+    },
+    "http": [
+      "GET /healthz returned 200.",
+      "GET /docs on both provider services returned 200.",
+      "Signed POST /webhooks/payments returned 204.",
+      "POST /generate returned 202 with task_id ed165e87-0137-408f-8701-ccf2feb57a5d.",
+      "GET /tasks/{task_id} returned 200 and reported processing on alpha.",
+      "Malformed POST /generate with an invalid user UUID returned 422.",
+      "A valid signed late POST /webhooks/providers/beta returned 204."
+    ],
+    "database_observations": [
+      "Before timeout: task and attempt were processing on alpha; ledger contained payment +100 and generation debit -2; balance was 98 and refund count was 0.",
+      "A bounded PostgreSQL LISTEN/NOTIFY subscriber observed the worker transition to queued and beta processing after the alpha deadline elapsed.",
+      "A direct SQL attempt-1 expiry returned UPDATE 0 because the live worker had already claimed that naturally expired deadline.",
+      "Direct SQL then set attempt 2 deadline to now()-interval '1 minute'; it returned UPDATE 1, and the listener observed task status failed.",
+      "After the valid late callback: task remained failed, result_url remained NULL, both attempts were timed_out with error_type timeout, exactly one refund row added +2, and the user's ledger sum was 100."
+    ],
+    "concurrency": "While the live API lifespan was running, the standalone PostgreSQL test tests/integration/test_watchdog.py::test_concurrent_watchdogs_claim_task_once passed (1 passed in 0.41s); four independent watchdog instances/sessions raced one due task and asserted exactly one claim/transition."
+  },
+  "adversarial_probes": {
+    "malformed_input": "Live malformed UUID request returned 422; the PostgreSQL suite also passed malformed signed callback and invalid-signature no-mutation cases.",
+    "stale_state": "Valid late completion after committed terminal timeout returned 204 but did not change failed state, result, refund count, or ledger balance.",
+    "dirty_worktree": "Preserved pre-existing modified .omo/plans/integer-generator-service.md and untracked .omo/evidence/task-4-gate-review.md, task-5-code-review.md, and task-6-gate-review.md; none is part of the task-7 staging set.",
+    "hung_commands": "Started tail -f /dev/null as a bounded process-control probe, stopped bash_31 with kill_bash, and verified HUNG_PROBE_ABSENT.",
+    "flaky_tests": "The four-test watchdog command passed after isolation and after test-helper extraction; the concurrent case also passed in the full suite and while the live API was running. Concurrency tests use AnyIO events/barriers and fail_after(10), with no sleeps.",
+    "misleading_success_output": "Compared HTTP 204 late-callback response and Uvicorn logs against direct PostgreSQL task, attempt, result, refund, and ledger rows; DB state remained terminal failed with one refund.",
+    "repeated_interruptions": "Full PostgreSQL suite passed tests/integration/test_provider_dispatch_crash_window.py::test_repeated_dispatch_interruption_preserves_committed_attempt.",
+    "prompt_injection": "N/A: this task changes database arbitration and service lifecycle, not an LLM prompt-processing path.",
+    "cancel_resume": "N/A: no user cancellation/resume workflow exists in this watchdog contract."
+  },
+  "cleanup": {
+    "temporary_notification_trigger_and_function": "Dropped successfully before database teardown.",
+    "api_and_provider_servers": "Stopped with kill_bash; their logs showed successful startup and expected HTTP traffic.",
+    "compose": "docker compose -p integer-generator-wave2-todo7 down -v --remove-orphans exited 0; container removed.",
+    "absence_checks": "docker compose ps -a was empty; no matching container, project volume, or project network remained; ports 8000/9101/9102 were free; hung probe process was absent."
+  },
+  "scope_and_risks": {
+    "staged_scope": "Task-7 implementation, migration, tests, dependency lock, and this evidence file only.",
+    "guarantee": "Only the PostgreSQL task/attempt/ledger business transition is serialized once. External provider HTTP work can be wasted or repeated and is not claimed to be exactly-once.",
+    "residual": "The existing Starlette TestClient/httpx deprecation warning remains outside task-7 scope."
+  }
+}

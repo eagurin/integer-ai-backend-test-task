@@ -1,5 +1,6 @@
 """Generation admission and task-status operations."""
 
+from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
@@ -33,14 +34,17 @@ from app.services.provider_callback_service import (
 class GenerationService:
     """Validates and persists generation work before calling the provider port."""
 
-    def __init__(self, provider: ProviderPort | None = None) -> None:
+    def __init__(
+        self, provider: ProviderPort | None = None, provider_timeout: float = 60.0
+    ) -> None:
         self.users = UserRepository()
         self.catalog = GenerationCatalogRepository()
         self.tasks = TaskRepository()
         self.attempts = AttemptRepository()
         self.ledger = TokenLedgerRepository()
         self.provider = provider or TemporaryProviderPort()
-        self.callbacks = ProviderCallbackService()
+        self.callbacks = ProviderCallbackService(provider_timeout)
+        self.provider_timeout = provider_timeout
 
     async def submit(self, session: AsyncSession, request: GenerateRequest) -> UUID:
         """Admit a task and debit in one transaction, then dispatch outside it."""
@@ -100,6 +104,8 @@ class GenerationService:
                     provider_leg_id=first_leg.id,
                     attempt_no=1,
                     status="queued",
+                    deadline_at=datetime.now(UTC)
+                    + timedelta(seconds=self.provider_timeout),
                 ),
             )
             task.current_attempt_id = attempt_id

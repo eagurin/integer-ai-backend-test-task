@@ -1,8 +1,8 @@
 """Guarded provider outcome transitions and failover selection."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
-from uuid import uuid4
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,11 +32,12 @@ class AttemptDispatch:
 class ProviderCallbackService:
     """Applies one callback to the current attempt, at most once."""
 
-    def __init__(self) -> None:
-        self.tasks = TaskRepository()
-        self.attempts = AttemptRepository()
-        self.catalog = GenerationCatalogRepository()
-        self.ledger = TokenLedgerRepository()
+    def __init__(self, provider_timeout: float = 60.0) -> None:
+        self.tasks: TaskRepository = TaskRepository()
+        self.attempts: AttemptRepository = AttemptRepository()
+        self.catalog: GenerationCatalogRepository = GenerationCatalogRepository()
+        self.ledger: TokenLedgerRepository = TokenLedgerRepository()
+        self.provider_timeout: float = provider_timeout
 
     async def apply(
         self,
@@ -89,6 +90,38 @@ class ProviderCallbackService:
 
                 assert_never(unreachable)
 
+    async def timeout_due(
+        self,
+        session: AsyncSession,
+        task_id: UUID,
+        now: datetime,
+    ) -> AttemptDispatch | None:
+        """Timeout one due current attempt under task-then-attempt locks."""
+        task = await self.tasks.get_for_update(session, task_id)
+        if task is None or task.status not in {"queued", "processing"}:
+            return None
+        attempt_id = task.current_attempt_id
+        if attempt_id is None:
+            return None
+        attempt = await self.attempts.get_current_for_update(
+            session, task.id, attempt_id
+        )
+        if (
+            attempt is None
+            or attempt.status not in {"queued", "processing"}
+            or attempt.deadline_at is None
+            or attempt.deadline_at > now
+        ):
+            return None
+        leg = await self.catalog.get_leg(session, attempt.provider_leg_id)
+        if leg is None:
+            return None
+
+        attempt.completed_at = now
+        attempt.error_type = "timeout"
+        attempt.status = "timed_out"
+        return await self._advance(session, task, leg, moderation=False)
+
     async def _advance(
         self,
         session: AsyncSession,
@@ -123,6 +156,7 @@ class ProviderCallbackService:
             provider_leg_id=next_leg.id,
             attempt_no=attempt_no,
             status="queued",
+            deadline_at=datetime.now(UTC) + timedelta(seconds=self.provider_timeout),
         )
         await self.attempts.add(session, new_attempt)
         task.current_provider_leg_id = next_leg.id
