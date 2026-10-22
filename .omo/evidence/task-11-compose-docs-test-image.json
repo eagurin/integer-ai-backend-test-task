@@ -1,0 +1,59 @@
+{
+  "task": "11. Include documentation assets in the Compose test image",
+  "date": "2026-10-22",
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-3-task-10",
+  "branch": "work/integer-generator-service-wave-3-task-10",
+  "task_10_commit": "3d2a7c449f8d28527acad37f35a0d3cc7724d122",
+  "followup_commit": {
+    "hash": "f4398c5696f86cdc4705b54690f6de2e1e092604",
+    "subject": "fix(compose): include docs in test image",
+    "change": "Dockerfile copies README.md, docs/, and scripts/ into /service."
+  },
+  "verification": [
+    {
+      "command": "docker compose --profile test run --rm tests uv run pytest -q",
+      "exit_code": 0,
+      "output": "89 passed, 1 warning in 1.72s",
+      "assertion": "Bare Compose invocation, no bind mounts. The image contains README.md, both architecture/lifecycle SVGs, and scripts/smoke.py."
+    },
+    {
+      "command": "docker compose --profile test run --rm tests uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "docker compose --profile test run --rm tests uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "77 files already formatted"
+    },
+    {
+      "command": "docker compose --profile test run --rm tests uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 76 source files"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo10 up --build -d",
+      "exit_code": 0,
+      "assertion": "Application db, alpha, beta, and API reported healthy; migrate exited successfully. The test profile uses a separate healthy test-db."
+    }
+  ],
+  "initial_failure_and_resolution": {
+    "command": "docker compose -p integer-generator-wave3-todo10 --profile test run --rm tests uv run pytest -q",
+    "exit_code": 1,
+    "output": "4 failed, 85 passed, 1 warning. The documentation tests raised FileNotFoundError for /service/docs/architecture.svg, /service/docs/task-lifecycle.svg, and /service/README.md.",
+    "cause": "The image copied tests but did not include the README, diagrams, or scripts needed by those tests.",
+    "resolution": "Added the three Dockerfile COPY entries, rebuilt the image, then passed the bare full test suite and all three bare quality commands. No Compose service graph or test database configuration was changed."
+  },
+  "cleanup": {
+    "command": "docker compose -p integer-generator-wave3-todo10 down -v --remove-orphans",
+    "exit_code": 0,
+    "receipts": {
+      "containers": "none",
+      "networks": "none",
+      "volumes": "none",
+      "listeners_5432_and_8000": "none"
+    }
+  },
+  "source_evidence": ".omo/evidence/task-10-integer-generator-service.json",
+  "residual": "The full test suite emitted one existing Starlette deprecation warning from starlette.testclient using httpx."
+}
