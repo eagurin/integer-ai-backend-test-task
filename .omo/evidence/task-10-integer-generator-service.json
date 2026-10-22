@@ -1,0 +1,147 @@
+{
+  "task": "10. Write the Russian README and migration/runbook guide",
+  "date": "2026-10-22",
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-3-task-10",
+  "branch": "work/integer-generator-service-wave-3-task-10",
+  "base_commit": "acdb5387ad184f3f9b1d59b578a57a2055c5bd2",
+  "test_image_followup_commit": "f4398c5696f86cdc4705b54690f6de2e1e092604",
+  "compose_project": "integer-generator-wave3-todo10",
+  "checks": [
+    {
+      "name": "compose_image_build",
+      "command": "docker compose -p integer-generator-wave3-todo10 build",
+      "exit_code": 0,
+      "output": "Image integer-generator-service:local Built"
+    },
+    {
+      "name": "compose_configuration",
+      "command": "docker compose config -q",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "name": "compose_application_startup",
+      "command": "docker compose -p integer-generator-wave3-todo10 up --build -d",
+      "exit_code": 0,
+      "assertions": "The application PostgreSQL, alpha, beta, and API reported healthy; the migration service exited successfully. The separate test-db was healthy under the test profile."
+    },
+    {
+      "name": "readme_contract_tests",
+      "command": "uv run pytest -q tests/docs/test_readme_contract.py",
+      "exit_code": 0,
+      "output": "3 passed in 0.03s"
+    },
+    {
+      "name": "broken_relative_asset_negative_scenario",
+      "command": "uv run pytest -q tests/docs/test_readme_contract.py::test_rejects_broken_relative_asset_link",
+      "exit_code": 0,
+      "output": "1 passed in 0.01s"
+    },
+    {
+      "name": "full_compose_postgresql_suite",
+      "command": "export COMPOSE_PROJECT_NAME=integer-generator-wave3-todo10 && docker compose --profile test run --rm tests uv run pytest -q",
+      "exit_code": 0,
+      "output": "89 passed, 1 warning in 1.72s",
+      "assertions": "Bare test-profile runner found README.md, docs/ SVGs, and scripts/smoke.py in the built image. No bind mounts were used."
+    },
+    {
+      "name": "ruff_check",
+      "command": "export COMPOSE_PROJECT_NAME=integer-generator-wave3-todo10 && docker compose --profile test run --rm tests uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "name": "ruff_format_check",
+      "command": "export COMPOSE_PROJECT_NAME=integer-generator-wave3-todo10 && docker compose --profile test run --rm tests uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "77 files already formatted"
+    },
+    {
+      "name": "mypy",
+      "command": "export COMPOSE_PROJECT_NAME=integer-generator-wave3-todo10 && docker compose --profile test run --rm tests uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 76 source files"
+    },
+    {
+      "name": "host_initial_migration",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic upgrade head",
+      "exit_code": 0,
+      "output": "INFO [alembic.runtime.migration] Context impl PostgresqlImpl. INFO [alembic.runtime.migration] Will assume transactional DDL."
+    },
+    {
+      "name": "real_http_smoke",
+      "command": "BASE_URL=http://localhost:8000 uv run python scripts/smoke.py",
+      "exit_code": 0,
+      "output": [
+        "payment: HTTP 204",
+        "balance: HTTP 200 user_id=UUID('7c6f8bcf-600c-4692-9c24-33664f31c637') balance=10 history=[LedgerEntryResponse(operation='payment', delta=10, created_at=datetime.datetime(2026, 10, 22, 1, 47, 4, 293191, tzinfo=TzInfo(0)))]",
+        "generate: HTTP 202 task_id=UUID('cb16ce4d-e334-4abb-bee5-8fadf5e7c153')",
+        "task: HTTP 200 task_id=UUID('cb16ce4d-e334-4abb-bee5-8fadf5e7c153') status=<TaskStatus.PROCESSING: 'processing'> current_provider='alpha' output=None history=[TaskHistoryEntry(provider='alpha', outcome=None, error=None, created_at=datetime.datetime(2026, 10, 22, 1, 47, 4, 324642, tzinfo=TzInfo(0)))]"
+      ],
+      "assertions": "The smoke parsed the actual response bodies into strict Pydantic response schemas. It requested status once and did not wait for or poll a provider callback."
+    },
+    {
+      "name": "live_http_manual_qa",
+      "command": "curl -fsS --max-time 5 http://localhost:8000/healthz && printf '\\n' && curl -fsS --max-time 5 http://localhost:8000/docs >/dev/null && printf 'docs: HTTP 200\\n' && BASE_URL=http://localhost:8000 uv run python scripts/smoke.py",
+      "exit_code": 0,
+      "output": [
+        "{\"status\":\"ok\"}",
+        "docs: HTTP 200",
+        "payment: HTTP 204",
+        "balance: HTTP 200 user_id=UUID('7c6f8bcf-600c-4692-9c24-33664f31c637') balance=10 history=[LedgerEntryResponse(operation='payment', delta=10, created_at=datetime.datetime(2026, 10, 22, 1, 47, 4, 293191, tzinfo=TzInfo(0)))]",
+        "generate: HTTP 202 task_id=UUID('cb16ce4d-e334-4abb-bee5-8fadf5e7c153')",
+        "task: HTTP 200 task_id=UUID('cb16ce4d-e334-4abb-bee5-8fadf5e7c153') status=<TaskStatus.PROCESSING: 'processing'> current_provider='alpha' output=None history=[TaskHistoryEntry(provider='alpha', outcome=None, error=None, created_at=datetime.datetime(2026, 10, 22, 1, 47, 4, 324642, tzinfo=TzInfo(0)))]"
+      ]
+    },
+    {
+      "name": "python_lsp_diagnostics",
+      "command": "LSP diagnostics for scripts/smoke.py and tests/docs/test_readme_contract.py",
+      "exit_code": 0,
+      "output": "No error diagnostics found."
+    },
+    {
+      "name": "changed_file_pure_loc",
+      "command": "awk pure LOC measurement for changed files",
+      "exit_code": 0,
+      "output": {
+        "Dockerfile": 20,
+        "README.md": 100,
+        ".env.example": 5,
+        "scripts/smoke.py": 72,
+        "tests/docs/test_readme_contract.py": 65
+      }
+    }
+  ],
+  "failure_and_resolution": [
+    {
+      "command": "docker compose -p integer-generator-wave3-todo10 --profile test run --rm tests uv run pytest -q",
+      "exit_code": 1,
+      "output": "4 failed, 85 passed, 1 warning. The docs tests raised FileNotFoundError for /service/docs/architecture.svg, /service/docs/task-lifecycle.svg, and /service/README.md.",
+      "cause": "The test image copied tests but omitted README.md, docs/, and scripts/.",
+      "resolution": "Dockerfile now copies README.md, docs/, and scripts/ into /service. Rebuilt the image and reran the exact bare Compose suite and all three quality commands successfully."
+    },
+    {
+      "command": "docker compose --profile test run --rm tests uv run ruff format --check .",
+      "exit_code": 1,
+      "output": "The format check identified one wrapped assertion in tests/docs/test_readme_contract.py.",
+      "resolution": "Applied Ruff's single-line formatting and rebuilt the image before the final bare Compose run."
+    }
+  ],
+  "residual": [
+    "The successful full suite reports one existing Starlette deprecation warning from tests using starlette.testclient with httpx."
+  ],
+  "cleanup": {
+    "command": "docker compose -p integer-generator-wave3-todo10 down -v --remove-orphans",
+    "exit_code": 0,
+    "verification": {
+      "command": "docker ps/network ls/volume ls filters for label com.docker.compose.project=integer-generator-wave3-todo10; lsof -nP -iTCP:5432 -iTCP:8000 -sTCP:LISTEN",
+      "exit_code": 0,
+      "output": [
+        "containers: none",
+        "networks: none",
+        "volumes: none",
+        "listeners 5432/8000: none"
+      ]
+    }
+  }
+}
