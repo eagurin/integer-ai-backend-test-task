@@ -30,12 +30,21 @@ class GenerationAttempt(Base):
             "status IN ('queued', 'processing', 'succeeded', 'failed', 'timed_out')",
             name="valid_status",
         ),
+        CheckConstraint(
+            "(dispatch_lease_token IS NULL) = (dispatch_lease_expires_at IS NULL)",
+            name="dispatch_lease_owner_matches_expiry",
+        ),
         Index(
             "ix_generation_attempts_unresolved_deadline",
             "deadline_at",
             postgresql_where=text(
                 "status IN ('queued', 'processing') AND deadline_at IS NOT NULL"
             ),
+        ),
+        Index(
+            "ix_generation_attempts_queued_dispatch_lease",
+            "dispatch_lease_expires_at",
+            postgresql_where=text("status = 'queued'"),
         ),
     )
 
@@ -65,5 +74,11 @@ class GenerationAttempt(Base):
         DateTime(timezone=True), nullable=True
     )
     deadline_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dispatch_lease_token: Mapped[UUID | None] = mapped_column(
+        PostgreSQLUUID(as_uuid=True), nullable=True
+    )
+    dispatch_lease_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

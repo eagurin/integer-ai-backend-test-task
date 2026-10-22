@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.generation_attempt import GenerationAttempt
@@ -62,10 +62,27 @@ class TaskRepository:
             )
             .where(
                 GenerationTask.status.in_(("queued", "processing")),
-                GenerationAttempt.status.in_(("queued", "processing")),
-                GenerationAttempt.deadline_at <= now,
+                or_(
+                    and_(
+                        GenerationAttempt.status == "queued",
+                        or_(
+                            GenerationAttempt.dispatch_lease_expires_at.is_(None),
+                            GenerationAttempt.dispatch_lease_expires_at <= now,
+                        ),
+                    ),
+                    and_(
+                        GenerationAttempt.status == "processing",
+                        GenerationAttempt.dispatch_lease_token.is_(None),
+                        GenerationAttempt.deadline_at <= now,
+                    ),
+                ),
             )
             .order_by(
+                case((GenerationAttempt.status == "queued", 0), else_=1),
+                func.coalesce(
+                    GenerationAttempt.dispatch_lease_expires_at,
+                    GenerationAttempt.deadline_at,
+                ).nulls_first(),
                 GenerationAttempt.deadline_at,
                 GenerationTask.created_at,
                 GenerationTask.id,

@@ -7,12 +7,12 @@
     "task_6_gate_review": "37f3f12a935f7b4877ac703215d9e2729b1985b8"
   },
   "implementation": [
-    "Each provider attempt stores its deadline before provider HTTP dispatch.",
+    "Queued attempts have no provider deadline until HTTP 202 is committed; every POST has a committed owner token and bounded dispatch lease first.",
     "Production app.main starts a bounded AnyIO watchdog from each worker lifespan; app factory defaults off for in-process tests.",
-    "Due tasks are selected in bounded batches with FOR UPDATE OF generation_tasks SKIP LOCKED.",
+    "The watchdog selects expired accepted attempts and queued attempts with absent or expired dispatch leases in bounded batches with FOR UPDATE OF generation_tasks SKIP LOCKED.",
     "Watchdog and callback lock the task before locking the current attempt; timeout, failover creation, or refund commit transactionally.",
-    "A partial PostgreSQL index covers unresolved attempt deadlines; migration backfills active attempts using the 60-second default.",
-    "Four PostgreSQL integration tests cover late completion, concurrent ticks, provider silence, and dispatch crash recovery."
+    "A partial PostgreSQL index covers unresolved attempt deadlines and a second index covers queued lease recovery; Alembic 0004 adds paired lease-token/expiry columns and a consistency constraint.",
+    "The four plan-named watchdog tests, two lease/recovery regressions, and the original interrupted-dispatch scenario use PostgreSQL sessions and deterministic event gates where concurrency is exercised."
   ],
   "commands": [
     {
@@ -80,6 +80,54 @@
       "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic current",
       "exit_code": 0,
       "result": "0003_provider_attempt_deadlines (head); pg_indexes confirmed ix_generation_attempts_unresolved_deadline on deadline_at with queued/processing and non-null predicate."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic upgrade head",
+      "exit_code": 0,
+      "result": "Fresh PostgreSQL applied 0001_initial_catalog, 0002_generation_input, 0003_provider_attempt_deadlines, and 0004_provider_dispatch_leases."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q tests/integration/test_watchdog.py::test_late_completed_after_watchdog_commit_is_ignored tests/integration/test_watchdog.py::test_concurrent_watchdogs_claim_task_once tests/integration/test_watchdog.py::test_provider_silence_times_out_and_fails_over tests/integration/test_watchdog.py::test_crash_before_provider_post_times_out_and_fails_over tests/integration/test_watchdog_dispatch_leases.py::test_watchdog_does_not_expire_provider_post_in_flight tests/integration/test_watchdog_dispatch_leases.py::test_watchdog_recovers_committed_undispatched_fallback tests/integration/test_provider_dispatch_crash_window.py::test_repeated_dispatch_interruption_preserves_committed_attempt",
+      "exit_code": 0,
+      "result": "7 passed in 0.79s after lease tests were moved into their dedicated file."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q",
+      "exit_code": 0,
+      "result": "Final full PostgreSQL suite after lease fixture isolation and test-file split: 80 passed, 1 warning in 2.10s. Warning is the pre-existing Starlette TestClient/httpx deprecation."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "result": "All checks passed."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "result": "78 files already formatted."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "result": "Success: no issues found in 72 source files."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "docker compose config -q",
+      "exit_code": 0,
+      "result": "No output; valid configuration."
+    },
+    {
+      "cwd": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-2",
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run alembic current",
+      "exit_code": 0,
+      "result": "0004_provider_dispatch_leases (head)."
     }
   ],
   "resolved_verification_failures": [
@@ -100,31 +148,38 @@
       "exit_code": 1,
       "result": "Initially identified two formatting differences.",
       "resolution": "Applied the required formatting; final format check exits 0."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q",
+      "exit_code": 1,
+      "result": "1 failed, 79 passed; the existing repeated-dispatch crash test expected an immediate retry while the persisted lease was still active.",
+      "resolution": "Updated that test to expire the dispatch lease between simulated process restarts; the final full suite passes."
+    },
+    {
+      "command": "DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator uv run pytest -q tests/integration/test_watchdog.py::test_watchdog_does_not_expire_provider_post_in_flight",
+      "exit_code": 1,
+      "result": "The test saw one globally due row from an earlier run; a direct PostgreSQL query identified a separate queued attempt whose bounded lease had expired.",
+      "resolution": "The watchdog test helper now defers unrelated queued attempts with a future lease and unrelated accepted attempts with future deadlines. The targeted test and final full suite pass."
     }
   ],
   "live_api_postgresql_qa": {
     "processes": {
-      "api": "uvicorn app.main:app on 127.0.0.1:8000; lifespan watchdog enabled; startup completed.",
-      "alpha": "uvicorn app.providers.alpha:app on 127.0.0.1:9101; startup completed.",
-      "beta": "uvicorn app.providers.beta:app on 127.0.0.1:9102; startup completed."
+      "api": "uvicorn app.main:app on 127.0.0.1:8000; PROVIDER_TIMEOUT=2, WATCHDOG_POLL_INTERVAL_SECONDS=6; lifespan watchdog enabled; startup completed.",
+      "alpha": "uvicorn app.providers.alpha:app on 127.0.0.1:9101; SYNC_FAILURE=timeout, SYNC_TIMEOUT_SECONDS=3; startup completed and returned HTTP 504.",
+      "beta": "uvicorn app.providers.beta:app on 127.0.0.1:9102; OMIT_CALLBACK=true; startup completed and returned HTTP 202."
     },
     "http": [
-      "GET /healthz returned 200.",
-      "GET /docs on both provider services returned 200.",
-      "Signed POST /webhooks/payments returned 204.",
-      "POST /generate returned 202 with task_id ed165e87-0137-408f-8701-ccf2feb57a5d.",
-      "GET /tasks/{task_id} returned 200 and reported processing on alpha.",
-      "Malformed POST /generate with an invalid user UUID returned 422.",
-      "A valid signed late POST /webhooks/providers/beta returned 204."
+      "One bounded POST /generate returned 202 for task 5cca898c-dbc5-4dee-9d8e-db56df334b29 in 3239 ms while alpha's synchronous POST took 3 seconds, exceeding the prior 2-second pre-dispatch deadline.",
+      "GET /tasks/5cca898c-dbc5-4dee-9d8e-db56df334b29 returned 200, reported beta as current provider, and showed alpha technical_error followed by beta processing.",
+      "A correctly HMAC-signed late POST /webhooks/providers/beta for attempt 2 returned 204 after watchdog terminal failure."
     ],
     "database_observations": [
-      "Before timeout: task and attempt were processing on alpha; ledger contained payment +100 and generation debit -2; balance was 98 and refund count was 0.",
-      "A bounded PostgreSQL LISTEN/NOTIFY subscriber observed the worker transition to queued and beta processing after the alpha deadline elapsed.",
-      "A direct SQL attempt-1 expiry returned UPDATE 0 because the live worker had already claimed that naturally expired deadline.",
-      "Direct SQL then set attempt 2 deadline to now()-interval '1 minute'; it returned UPDATE 1, and the listener observed task status failed.",
-      "After the valid late callback: task remained failed, result_url remained NULL, both attempts were timed_out with error_type timeout, exactly one refund row added +2, and the user's ledger sum was 100."
+      "The QA user and +100 funding ledger entry were inserted directly into the fresh PostgreSQL database; live HTTP scope stayed limited to generate, status, and the late callback.",
+      "After alpha returned 504, PostgreSQL showed attempt 1 failed with technical_error and attempt 2 processing on beta; beta's callback was intentionally omitted.",
+      "The live watchdog persisted task failed, result_url NULL, attempts 1:failed:technical_error and 2:timed_out:timeout, exactly one generation refund, and ledger sum 100.",
+      "After the valid late beta callback returned 204, a second PostgreSQL query showed the same failed task, NULL result, one refund, and balance 100."
     ],
-    "concurrency": "While the live API lifespan was running, the standalone PostgreSQL test tests/integration/test_watchdog.py::test_concurrent_watchdogs_claim_task_once passed (1 passed in 0.41s); four independent watchdog instances/sessions raced one due task and asserted exactly one claim/transition."
+    "concurrency": "The full PostgreSQL suite passed the concurrent watchdog test using four independent watchdog instances/sessions and asserted exactly one transition."
   },
   "adversarial_probes": {
     "malformed_input": "Live malformed UUID request returned 422; the PostgreSQL suite also passed malformed signed callback and invalid-signature no-mutation cases.",
@@ -138,14 +193,13 @@
     "cancel_resume": "N/A: no user cancellation/resume workflow exists in this watchdog contract."
   },
   "cleanup": {
-    "temporary_notification_trigger_and_function": "Dropped successfully before database teardown.",
-    "api_and_provider_servers": "Stopped with kill_bash; their logs showed successful startup and expected HTTP traffic.",
-    "compose": "docker compose -p integer-generator-wave2-todo7 down -v --remove-orphans exited 0; container removed.",
-    "absence_checks": "docker compose ps -a was empty; no matching container, project volume, or project network remained; ports 8000/9101/9102 were free; hung probe process was absent."
+    "api_and_provider_servers": "API, alpha, and beta uvicorn processes were stopped with kill_bash after their expected HTTP logs.",
+    "compose": "docker compose -p integer-generator-wave2-todo7-fix down -v --remove-orphans exited 0 after live QA and final test reruns; QA container, network, and postgres-data volume were removed.",
+    "absence_checks": "docker ps -a, docker volume ls, and docker network ls filtered by integer-generator-wave2-todo7-fix returned no resources; lsof found no listeners on ports 8000, 9101, or 9102."
   },
   "scope_and_risks": {
-    "staged_scope": "Task-7 implementation, migration, tests, dependency lock, and this evidence file only.",
-    "guarantee": "Only the PostgreSQL task/attempt/ledger business transition is serialized once. External provider HTTP work can be wasted or repeated and is not claimed to be exactly-once.",
-    "residual": "The existing Starlette TestClient/httpx deprecation warning remains outside task-7 scope."
+    "staged_scope": "Task-7 implementation, dispatch lease migration, status-read responsibility split, PostgreSQL tests, and this evidence file only.",
+    "guarantee": "Only the PostgreSQL task/attempt/ledger business transition is serialized once. Expired leases may cause provider HTTP to be retried; exactly-once external HTTP is not claimed.",
+    "residual": "The existing Starlette TestClient/httpx deprecation warning remains. The workspace LSP reports reportMissingImports for app.services.task_status_service, while uv run mypy ., the focused status integration test, and the full PostgreSQL suite all resolve and pass."
   }
 }

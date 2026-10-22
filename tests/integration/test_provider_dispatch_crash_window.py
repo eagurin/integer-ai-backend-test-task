@@ -21,6 +21,7 @@ from tests.integration.provider_helpers import (
     close_client,
     funded_user,
 )
+from tests.integration.watchdog_helpers import expire_dispatch_lease
 
 
 class InterruptedProvider:
@@ -67,6 +68,7 @@ async def test_repeated_dispatch_interruption_preserves_committed_attempt(
             ),
         )
         for _ in range(2):
+            await expire_dispatch_lease(session_factory, task.id, 1)
             with pytest.raises(httpx.ConnectError):
                 async with session_factory() as session:
                     await service.dispatch(session, dispatch)
@@ -99,6 +101,7 @@ async def test_repeated_dispatch_interruption_preserves_committed_attempt(
         assert balance == 98
 
         service.provider = TemporaryProviderPort()
+        await expire_dispatch_lease(session_factory, task.id, 1)
         async with session_factory() as session:
             await service.dispatch(session, dispatch)
         completed = await callback(client, task.id, 1, "alpha", "completed")

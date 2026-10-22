@@ -18,7 +18,10 @@ from tests.integration.provider_helpers import (
     funded_user,
     generate,
 )
-from tests.integration.watchdog_helpers import expire_attempt
+from tests.integration.watchdog_helpers import (
+    expire_attempt,
+    expire_dispatch_lease,
+)
 
 
 async def test_late_completed_after_watchdog_commit_is_ignored(
@@ -183,7 +186,7 @@ class InterruptedProvider:
 async def test_crash_before_provider_post_times_out_and_fails_over(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    """A committed attempt survives dispatch crash and watchdog failover."""
+    """A committed attempt is redispatched after its lease expires."""
     user_id = await funded_user(session_factory)
     client, cleanup, service = await client_for(session_factory, InterruptedProvider())
     watchdog = Watchdog(session_factory, service)
@@ -209,11 +212,13 @@ async def test_crash_before_provider_post_times_out_and_fails_over(
                     GenerationAttempt.attempt_no == 1,
                 )
             )
-            assert attempt is not None and attempt.deadline_at is not None
+            assert attempt is not None and attempt.deadline_at is None
+            assert attempt.dispatch_lease_token is not None
             task_id = task.id
 
         await expire_attempt(session_factory, task_id, 1)
         service.provider = SequenceProvider([202])
+        await expire_dispatch_lease(session_factory, task_id, 1)
         assert await watchdog.run_once() == 1
         async with session_factory() as session:
             task = await session.get(GenerationTask, task_id)
@@ -232,8 +237,8 @@ async def test_crash_before_provider_post_times_out_and_fails_over(
                 )
             )
         assert task is not None and task.status == "processing"
+        assert task.current_attempt_id == attempts[0].id
         assert [(attempt.status, attempt.error_type) for attempt in attempts] == [
-            ("timed_out", "timeout"),
             ("processing", None),
         ]
         assert balance == 98

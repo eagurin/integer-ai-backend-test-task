@@ -1,7 +1,7 @@
 """Guarded provider outcome transitions and failover selection."""
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,6 +63,8 @@ class ProviderCallbackService:
             return None
 
         attempt.completed_at = datetime.now(UTC)
+        attempt.dispatch_lease_token = None
+        attempt.dispatch_lease_expires_at = None
         match event.outcome:
             case ProviderOutcome.COMPLETED:
                 attempt.error_type = None
@@ -108,7 +110,8 @@ class ProviderCallbackService:
         )
         if (
             attempt is None
-            or attempt.status not in {"queued", "processing"}
+            or attempt.status != "processing"
+            or attempt.dispatch_lease_token is not None
             or attempt.deadline_at is None
             or attempt.deadline_at > now
         ):
@@ -156,7 +159,6 @@ class ProviderCallbackService:
             provider_leg_id=next_leg.id,
             attempt_no=attempt_no,
             status="queued",
-            deadline_at=datetime.now(UTC) + timedelta(seconds=self.provider_timeout),
         )
         await self.attempts.add(session, new_attempt)
         task.current_provider_leg_id = next_leg.id
