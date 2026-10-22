@@ -2,6 +2,7 @@
 
 import os
 from collections.abc import AsyncIterator
+from urllib.parse import urlsplit
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import (
@@ -17,7 +18,10 @@ async def database_engine() -> AsyncIterator[AsyncEngine]:
     """Connect to PostgreSQL; schema lifecycle belongs to Alembic, not tests."""
     database_url = os.environ.get(
         "DATABASE_URL",
-        "postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator",
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/integer_generator_test",
+    )
+    assert urlsplit(database_url).path.removeprefix("/") == "integer_generator_test", (
+        "Integration tests require the isolated test database"
     )
     engine = create_async_engine(database_url, pool_pre_ping=True, pool_size=20)
     try:

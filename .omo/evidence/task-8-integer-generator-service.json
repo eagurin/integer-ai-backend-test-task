@@ -1,0 +1,178 @@
+{
+  "task": 8,
+  "date": "2026-10-22",
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-3-task-8",
+  "branch": "work/integer-generator-service-wave-3-task-8",
+  "base_commit": "27179ca98b86f41b7c4c70a4063ed00ba2fea3d1",
+  "implementation": [
+    "Default Compose graph starts PostgreSQL 18, waits for its healthcheck, applies Alembic once, then starts a four-worker Uvicorn API and independent alpha/beta fake providers from the shared image.",
+    "API startup depends on healthy PostgreSQL, successful migration completion, and healthy alpha/beta providers. API and both provider processes have healthchecks.",
+    "The test profile provisions its own PostgreSQL 18 database and volume, runs a separate Alembic migration, and gates the pytest runner on successful migration.",
+    "Integration fixtures default to integer_generator_test and reject any DATABASE_URL whose database path differs. Compose contract tests parse the YAML into typed Pydantic models and assert the startup graph, four workers, isolated test DATABASE_URLs, healthchecks, profiles, and absence of container_name.",
+    "The Docker image includes Alembic files, tests, and compose.yaml; .dockerignore no longer excludes tests. PyYAML stubs are a locked dev dependency for the typed YAML contract test."
+  ],
+  "database_isolation": {
+    "effective_database_urls": {
+      "api": "postgresql+asyncpg://postgres:postgres@db:5432/integer_generator",
+      "tests": "postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test",
+      "test_migrate": "postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test"
+    },
+    "url_validation": "tests/conftest.py asserts urlsplit(DATABASE_URL).path.removeprefix('/') == 'integer_generator_test' before creating the engine.",
+    "compose_contract": "tests/unit/test_compose_contract.py::test_test_profile_migrates_and_uses_a_separate_database passed.",
+    "application_database_after_full_suite": {
+      "command": "docker compose -p integer-generator-wave3-todo8 exec -T db psql -U postgres -d integer_generator -Atc 'SELECT current_database(), (SELECT count(*) FROM users), (SELECT count(*) FROM token_ledger_entries), (SELECT count(*) FROM generation_tasks)'",
+      "exit_code": 0,
+      "output": "integer_generator|0|0|0"
+    }
+  },
+  "commands": [
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 config -q",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 up --build -d --wait --wait-timeout 180 && docker compose -p integer-generator-wave3-todo8 ps --all",
+      "exit_code": 0,
+      "output": "NAME                                           IMAGE                                                                     COMMAND                  SERVICE        CREATED              STATUS                          PORTS\ninteger-generator-wave3-todo8-alpha-1          integer-generator-service:local                                           \"uv run --no-sync uv…\"   alpha          About a minute ago   Up About a minute (healthy)     8000/tcp\ninteger-generator-wave3-todo8-api-1            integer-generator-service:local                                           \"uv run --no-sync uv…\"   api            About a minute ago   Up About a minute (healthy)     0.0.0.0:8000->8000/tcp, [::]:8000->8000/tcp\ninteger-generator-wave3-todo8-beta-1           integer-generator-service:local                                           \"uv run --no-sync uv…\"   beta           About a minute ago   Up About a minute (healthy)     8000/tcp\ninteger-generator-wave3-todo8-db-1             postgres:18                                                               \"docker-entrypoint.s…\"   db             About a minute ago   Up About a minute (healthy)     0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp\ninteger-generator-wave3-todo8-migrate-1        integer-generator-service:local                                           \"uv run --no-sync al…\"   migrate        About a minute ago   Exited (0) About a minute ago\ninteger-generator-wave3-todo8-test-db-1        postgres:18                                                               \"docker-entrypoint.s…\"   test-db        5 minutes ago        Up 4 minutes (healthy)          5432/tcp\ninteger-generator-wave3-todo8-test-migrate-1   sha256:30842776fd42ba702ece52c456e631cc0c505653f90f75213be37fdd2ec8a008   \"uv run --no-sync al…\"   test-migrate   3 minutes ago        Exited (0) 2 minutes ago"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 top api",
+      "exit_code": 0,
+      "output": "Parent Uvicorn command contained --workers 4; docker compose top showed four multiprocessing worker processes."
+    },
+    {
+      "command": "curl -fsS --max-time 5 http://localhost:8000/healthz",
+      "exit_code": 0,
+      "output": "{\"status\":\"ok\"}"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test config --format json | python -c 'import json, sys; services=json.load(sys.stdin)[\"services\"]; app=services[\"api\"][\"environment\"][\"DATABASE_URL\"]; test=services[\"tests\"][\"environment\"][\"DATABASE_URL\"]; migration=services[\"test-migrate\"][\"environment\"][\"DATABASE_URL\"]; print(f\"api DATABASE_URL={app}\"); print(f\"tests DATABASE_URL={test}\"); print(f\"test-migrate DATABASE_URL={migration}\"); assert app != test == migration and app.endswith(\"/integer_generator\") and test.endswith(\"/integer_generator_test\")'",
+      "exit_code": 0,
+      "output": "api DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/integer_generator\ntests DATABASE_URL=postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test\ntest-migrate DATABASE_URL=postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test build tests",
+      "exit_code": 0,
+      "output": "Image integer-generator-service:local Built"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test run --rm tests uv run pytest -q",
+      "exit_code": 0,
+      "output": "83 passed, 1 warning in 1.50s"
+    },
+    {
+      "command": "uv run pytest -q tests/unit/test_compose_contract.py::test_api_requires_healthy_database_and_completed_migration",
+      "exit_code": 0,
+      "output": ". [100%]\n1 passed in 0.08s"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test run --rm tests uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test run --rm tests uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "73 files already formatted"
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test run --rm tests uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 73 source files"
+    },
+    {
+      "command": "uv run ruff check .",
+      "exit_code": 0,
+      "output": "All checks passed!"
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 0,
+      "output": "75 files already formatted"
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 0,
+      "output": "Success: no issues found in 73 source files"
+    },
+    {
+      "command": "GIT_MASTER=1 git diff --check",
+      "exit_code": 0,
+      "output": ""
+    },
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 down -v --remove-orphans",
+      "exit_code": 0,
+      "output": "[+] down 10/10\n ✔ Container integer-generator-wave3-todo8-test-migrate-1 Removed\n ✔ Container integer-generator-wave3-todo8-api-1 Removed\n ✔ Container integer-generator-wave3-todo8-test-db-1 Removed\n ✔ Container integer-generator-wave3-todo8-alpha-1 Removed\n ✔ Container integer-generator-wave3-todo8-migrate-1 Removed\n ✔ Container integer-generator-wave3-todo8-beta-1 Removed\n ✔ Container integer-generator-wave3-todo8-db-1 Removed\n ✔ Volume integer-generator-wave3-todo8_test-postgres-data Removed\n ✔ Volume integer-generator-wave3-todo8_postgres-data Removed\n ✔ Network integer-generator-wave3-todo8_default Removed"
+    },
+    {
+      "command": "docker ps -a --filter label=com.docker.compose.project=integer-generator-wave3-todo8 --format '{{.Names}}'; docker network ls --filter label=com.docker.compose.project=integer-generator-wave3-todo8 --format '{{.Name}}'; docker volume ls --filter label=com.docker.compose.project=integer-generator-wave3-todo8 --format '{{.Name}}'; lsof -nP -iTCP:8000 -sTCP:LISTEN; lsof -nP -iTCP:5432 -sTCP:LISTEN; lsof -nP -iTCP:9100 -sTCP:LISTEN",
+      "exit_code": 0,
+      "output": "--- project containers ---\n--- project networks ---\n--- project volumes ---\n--- host listeners ---\nport 8000: none\nport 5432: none\nport 9100: none"
+    }
+  ],
+  "resolved_verification_failures": [
+    {
+      "command": "docker compose -p integer-generator-wave3-todo8 --profile test run --rm tests uv run pytest -q",
+      "exit_code": 1,
+      "output": "3 failed, 80 passed, 1 warning in 2.27s. Each contract-test failure was FileNotFoundError: /service/compose.yaml.",
+      "resolution": "Added COPY compose.yaml ./ to Dockerfile, rebuilt the shared image, then reran the full suite: 83 passed, 1 warning in 1.50s."
+    },
+    {
+      "command": "uv run ruff format --check .",
+      "exit_code": 1,
+      "output": "Ruff reported tests/conftest.py would be reformatted.",
+      "resolution": "Applied Ruff's requested line wrapping using apply_patch; final local and Compose format checks both exited 0."
+    },
+    {
+      "command": "uv run mypy .",
+      "exit_code": 1,
+      "output": "Library stubs not installed for yaml [import-untyped].",
+      "resolution": "Added types-PyYAML to the dev dependency group and regenerated uv.lock with uv lock; final mypy checks passed."
+    }
+  ],
+  "warnings": [
+    "The full suite emitted the pre-existing StarletteDeprecationWarning that Starlette TestClient currently uses httpx and recommends httpx2. It did not fail tests."
+  ],
+  "scope": {
+    "changed_paths": [
+      ".dockerignore",
+      "Dockerfile",
+      "compose.yaml",
+      "pyproject.toml",
+      "tests/conftest.py",
+      "tests/unit/test_compose_contract.py",
+      "uv.lock",
+      ".omo/evidence/task-8-integer-generator-service.json"
+    ],
+    "excluded": [
+      "README.md",
+      "docs/architecture.svg",
+      "docs/task-lifecycle.svg",
+      "scripts/smoke.py"
+    ],
+    "plan_and_boulder_files_modified": false,
+    "remote_or_push": false
+  },
+  "post_write_review": {
+    "module_responsibility": "The added test module owns Compose startup/database-isolation contracts; the existing fixture owns integration database connection safety.",
+    "boundary_parsing": "Compose YAML is parsed by PyYAML and validated into Pydantic models before contract assertions.",
+    "variants_and_escape_hatches": "No variant dispatch, Any/cast/ignore escape hatch, or new exception-catching path was introduced.",
+    "helpers_and_tests": "load_compose is shared by three contract checks; contracts fail if startup dependencies disappear; fixture guard rejects the application database.",
+    "size_and_parameters": "Changed Python files are below 200 nonblank noncomment lines; no new function has more than one parameter.",
+    "verification_and_logging": "No redundant post-action verification or logging was added; Ruff, format, mypy, diff check, Compose startup, and PostgreSQL tests passed."
+  },
+  "cleanup": {
+    "project": "integer-generator-wave3-todo8",
+    "down_exit_code": 0,
+    "containers_absent": true,
+    "network_absent": true,
+    "volumes_absent": true,
+    "listeners_absent": {
+      "8000": true,
+      "5432": true,
+      "9100": true
+    }
+  }
+}

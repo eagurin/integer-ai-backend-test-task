@@ -1,3 +1,8 @@
+x-service-image: &service-image
+  image: integer-generator-service:local
+  build:
+    context: .
+
 services:
   db:
     image: postgres:18
@@ -16,5 +21,163 @@ services:
       retries: 10
       start_period: 5s
 
+  migrate:
+    <<: *service-image
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/integer_generator
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    <<: *service-image
+    command:
+      [
+        "uv",
+        "run",
+        "--no-sync",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "4",
+      ]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/integer_generator
+      WEBHOOK_SECRET: local-compose-webhook-secret
+      PROVIDER_ALPHA_URL: http://alpha:9100
+      PROVIDER_BETA_URL: http://beta:9100
+      PROVIDER_CALLBACK_URL: http://api:8000/webhooks/providers
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      alpha:
+        condition: service_healthy
+      beta:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:8000/healthz', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  alpha:
+    <<: *service-image
+    command:
+      [
+        "uv",
+        "run",
+        "--no-sync",
+        "uvicorn",
+        "app.providers.alpha:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+      ]
+    environment:
+      PROVIDER_NAME: alpha
+      FAILURE_TYPE: completed
+      FAILURE_PROBABILITY: "0"
+      SYNC_FAILURE: none
+      CALLBACK_DELAY_SECONDS: "2"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:9100/openapi.json', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  beta:
+    <<: *service-image
+    command:
+      [
+        "uv",
+        "run",
+        "--no-sync",
+        "uvicorn",
+        "app.providers.beta:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9100",
+      ]
+    environment:
+      PROVIDER_NAME: beta
+      FAILURE_TYPE: completed
+      FAILURE_PROBABILITY: "0"
+      SYNC_FAILURE: none
+      CALLBACK_DELAY_SECONDS: "2"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; urlopen('http://127.0.0.1:9100/openapi.json', timeout=2).read()",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  test-db:
+    image: postgres:18
+    profiles: ["test"]
+    environment:
+      POSTGRES_DB: integer_generator_test
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    volumes:
+      - test-postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d integer_generator_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  test-migrate:
+    <<: *service-image
+    profiles: ["test"]
+    command: ["uv", "run", "--no-sync", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test
+    depends_on:
+      test-db:
+        condition: service_healthy
+
+  tests:
+    <<: *service-image
+    profiles: ["test"]
+    command: ["uv", "run", "--no-sync", "pytest", "-q"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@test-db:5432/integer_generator_test
+    depends_on:
+      test-migrate:
+        condition: service_completed_successfully
+
 volumes:
   postgres-data:
+  test-postgres-data:

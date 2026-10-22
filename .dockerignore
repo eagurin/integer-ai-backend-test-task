@@ -7,4 +7,3 @@ __pycache__
 *.py[cod]
 .env
 .omo
-tests
