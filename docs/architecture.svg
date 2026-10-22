@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 620" role="img" aria-labelledby="title desc">
+  <title id="title">Integer Generator Service Architecture</title>
+  <desc id="desc">HTTP controllers call services, which use repositories to persist state in PostgreSQL. Generation services dispatch through separate alpha and beta provider paths and accept signed callbacks.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0 0 L10 4 L0 8 Z" fill="black"/>
+    </marker>
+    <style>
+      text { font-family: sans-serif; fill: black; }
+      .heading { font-size: 25px; font-weight: 700; }
+      .label { font-size: 17px; font-weight: 700; }
+      .small { font-size: 14px; }
+      .box { fill: white; stroke: black; stroke-width: 2; }
+      .line { fill: none; stroke: black; stroke-width: 2; marker-end: url(#arrow); }
+      .return { fill: none; stroke: black; stroke-width: 2; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1120" height="620" fill="white"/>
+  <text class="heading" x="48" y="52">Service architecture</text>
+  <text class="small" x="48" y="80">Request handling and durable state</text>
+
+  <rect class="box" x="48" y="130" width="190" height="92" rx="4"/>
+  <text class="label" x="143" y="166" text-anchor="middle">HTTP controllers</text>
+  <text class="small" x="143" y="193" text-anchor="middle">generation · payments · callbacks</text>
+
+  <rect class="box" x="305" y="130" width="220" height="92" rx="4"/>
+  <text class="label" x="415" y="166" text-anchor="middle">Application services</text>
+  <text class="small" x="415" y="193" text-anchor="middle">admission · billing · orchestration</text>
+  <path class="line" d="M238 176 H300"/>
+
+  <rect class="box" x="592" y="130" width="210" height="92" rx="4"/>
+  <text class="label" x="697" y="166" text-anchor="middle">Repositories</text>
+  <text class="small" x="697" y="193" text-anchor="middle">tasks · attempts · token ledger</text>
+  <path class="line" d="M525 176 H587"/>
+
+  <rect class="box" x="875" y="130" width="195" height="92" rx="4"/>
+  <text class="label" x="972" y="166" text-anchor="middle">PostgreSQL</text>
+  <text class="small" x="972" y="193" text-anchor="middle">tasks · attempts · balances</text>
+  <path class="line" d="M802 176 H870"/>
+
+  <text class="label" x="305" y="294">Provider dispatch</text>
+  <path class="line" d="M415 222 V280 H220 V340"/>
+  <path class="line" d="M415 280 H610 V340"/>
+  <rect class="box" x="95" y="340" width="250" height="105" rx="4"/>
+  <text class="label" x="220" y="377" text-anchor="middle">Alpha provider</text>
+  <text class="small" x="220" y="405" text-anchor="middle">submit generation request</text>
+  <text class="small" x="220" y="428" text-anchor="middle">signed callback → controller</text>
+
+  <rect class="box" x="485" y="340" width="250" height="105" rx="4"/>
+  <text class="label" x="610" y="377" text-anchor="middle">Beta provider</text>
+  <text class="small" x="610" y="405" text-anchor="middle">submit generation request</text>
+  <text class="small" x="610" y="428" text-anchor="middle">signed callback → controller</text>
+
+  <path class="return" d="M220 340 V262 H143 V227"/>
+  <path class="return" d="M610 340 V262 H143"/>
+
+  <rect class="box" x="810" y="340" width="260" height="105" rx="4"/>
+  <text class="label" x="940" y="377" text-anchor="middle">Provider ports</text>
+  <text class="small" x="940" y="405" text-anchor="middle">shared dispatch contract</text>
+  <text class="small" x="940" y="428" text-anchor="middle">configured alpha / beta clients</text>
+  <path class="line" d="M810 390 H740"/>
+
+  <path class="line" d="M345 390 H480"/>
+  <path class="line" d="M485 414 H350"/>
+  <text class="small" x="413" y="472" text-anchor="middle">request / callback outcome</text>
+
+  <text class="small" x="48" y="548">Solid arrows: request and persistence flow</text>
+  <path class="line" d="M48 580 H105"/>
+  <text class="small" x="126" y="585">Dashed arrows: signed provider callbacks</text>
+</svg>

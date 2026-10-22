@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1120 650" role="img" aria-labelledby="title desc">
+  <title id="title">Generation Task and Attempt Lifecycle</title>
+  <desc id="desc">A task is accepted, dispatched into provider attempts, and completed or failed. A timeout may commit terminal failure and refund tokens. The first committed terminal result wins; stale or late callbacks are ignored without changing the task or balance.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto">
+      <path d="M0 0 L10 4 L0 8 Z" fill="black"/>
+    </marker>
+    <style>
+      text { font-family: sans-serif; fill: black; }
+      .heading { font-size: 25px; font-weight: 700; }
+      .label { font-size: 17px; font-weight: 700; }
+      .small { font-size: 14px; }
+      .box { fill: white; stroke: black; stroke-width: 2; }
+      .terminal { fill: black; stroke: black; stroke-width: 2; }
+      .terminal-text { fill: white; font-size: 16px; font-weight: 700; }
+      .line { fill: none; stroke: black; stroke-width: 2; marker-end: url(#arrow); }
+      .dashed { fill: none; stroke: black; stroke-width: 2; stroke-dasharray: 7 5; marker-end: url(#arrow); }
+    </style>
+  </defs>
+  <rect width="1120" height="650" fill="white"/>
+  <text class="heading" x="48" y="52">Task and attempt lifecycle</text>
+  <text class="small" x="48" y="80">The first committed terminal outcome is authoritative</text>
+
+  <rect class="box" x="58" y="150" width="170" height="76" rx="4"/>
+  <text class="label" x="143" y="181" text-anchor="middle">Accepted</text>
+  <text class="small" x="143" y="205" text-anchor="middle">tokens reserved</text>
+
+  <rect class="box" x="310" y="150" width="185" height="76" rx="4"/>
+  <text class="label" x="402" y="181" text-anchor="middle">Attempt created</text>
+  <text class="small" x="402" y="205" text-anchor="middle">provider call recorded</text>
+  <path class="line" d="M228 188 H305"/>
+
+  <rect class="box" x="575" y="150" width="190" height="76" rx="4"/>
+  <text class="label" x="670" y="181" text-anchor="middle">Provider running</text>
+  <text class="small" x="670" y="205" text-anchor="middle">await callback or timeout</text>
+  <path class="line" d="M495 188 H570"/>
+
+  <rect class="box" x="310" y="315" width="185" height="76" rx="4"/>
+  <text class="label" x="402" y="346" text-anchor="middle">Retry eligible</text>
+  <text class="small" x="402" y="370" text-anchor="middle">next configured leg</text>
+  <path class="dashed" d="M402 226 V310"/>
+  <text class="small" x="416" y="276">retryable failure</text>
+
+  <path class="line" d="M495 353 H825 V188 H810"/>
+  <text class="small" x="635" y="340">new attempt</text>
+
+  <rect class="terminal" x="855" y="130" width="205" height="76" rx="4"/>
+  <text class="terminal-text" x="957" y="162" text-anchor="middle">Completed</text>
+  <text class="terminal-text" x="957" y="186" text-anchor="middle">result stored</text>
+  <path class="line" d="M765 165 H850"/>
+  <text class="small" x="775" y="145">success callback</text>
+
+  <rect class="terminal" x="855" y="275" width="205" height="92" rx="4"/>
+  <text class="terminal-text" x="957" y="308" text-anchor="middle">Failed</text>
+  <text class="terminal-text" x="957" y="334" text-anchor="middle">tokens refunded</text>
+  <text class="terminal-text" x="957" y="356" text-anchor="middle">once</text>
+  <path class="line" d="M765 211 V321 H850"/>
+  <text class="small" x="683" y="239">timeout or terminal failure</text>
+
+  <rect class="box" x="58" y="475" width="440" height="100" rx="4"/>
+  <text class="label" x="278" y="510" text-anchor="middle">Stale or late callback</text>
+  <text class="small" x="278" y="538" text-anchor="middle">A terminal task is unchanged; no second refund</text>
+  <text class="small" x="278" y="559" text-anchor="middle">callback is acknowledged and ignored</text>
+  <path class="dashed" d="M957 367 V525 H503"/>
+
+  <rect class="box" x="575" y="475" width="485" height="100" rx="4"/>
+  <text class="label" x="817" y="510" text-anchor="middle">Attempt outcomes</text>
+  <text class="small" x="817" y="538" text-anchor="middle">submitted → succeeded | retryable failure | terminal failure</text>
+  <text class="small" x="817" y="559" text-anchor="middle">timeout is terminal when the deadline wins the commit</text>
+  <path class="dashed" d="M670 226 V455 H817 V470"/>
+
+  <text class="small" x="58" y="618">Dashed paths show timeout, retry, callback, and attempt-history relationships.</text>
+</svg>

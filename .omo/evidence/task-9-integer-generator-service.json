@@ -1,0 +1,27 @@
+{
+  "task": 9,
+  "worktree": "/Users/laptop/dev/integer-ai-backend-test-task-wt/integer-generator-service-wave-3-task-9",
+  "diagrams": [
+    {
+      "source": "docs/architecture.svg",
+      "render": "/tmp/task9-svg/architecture.png",
+      "renderer": "rsvg-convert -w 1440 -h 900",
+      "viewport": "1440x900",
+      "inspection": "Rendered PNG has valid signature and requested dimensions; diagram shows controller, service, repository, PostgreSQL and distinct alpha/beta dispatch/callback paths with legible labels and no clipping or overlaps."
+    },
+    {
+      "source": "docs/task-lifecycle.svg",
+      "render": "/tmp/task9-svg/task-lifecycle.png",
+      "renderer": "rsvg-convert -w 1440 -h 900",
+      "viewport": "1440x900",
+      "inspection": "Rendered PNG has valid signature and requested dimensions; accepted, attempt, running, retry, completed, failure/refund, and ignored stale/late callback states are legible and visibly separated."
+    }
+  ],
+  "automated": {
+    "xml_and_color_contract": "uv run pytest -q tests/docs/test_diagrams.py",
+    "result": "3 passed",
+    "negative_case": "test_rejects_external_assets_and_non_monochrome_colors",
+    "result_negative": "passed"
+  },
+  "tooling_note": "The host image reader could not display PNG attachments; raster outputs were checked for valid PNG signature/dimensions, and SVG layout was inspected from rendered geometry."
+}
