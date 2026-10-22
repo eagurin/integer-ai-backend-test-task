@@ -17,6 +17,9 @@ COPY alembic ./alembic
 COPY alembic.ini ./
 COPY compose.yaml ./
 COPY tests ./tests
+COPY README.md ./
+COPY docs ./docs
+COPY scripts ./scripts
 RUN uv sync --locked --group dev
 
 EXPOSE 8000
